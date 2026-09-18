@@ -11,8 +11,8 @@ tiempo real, herramientas para una distribuidora y la capa de datos que sostiene
 ## Cómo verlo
 
 ```bash
-git clone https://github.com/<tu-usuario>/code-portafolio.git
-cd code-portafolio
+git clone https://github.com/Hpaku96/codeweb.git
+cd codeweb
 # basta con abrir index.html en el navegador
 ```
 

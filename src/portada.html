@@ -286,6 +286,26 @@ h1,h2,h3{font-family:var(--display);margin:0;letter-spacing:-.01em}
   .car-detail{grid-template-columns:1fr}
   .car-open{justify-self:start}
 }
+.car-fallback{margin-top:8px}
+.car-fallback p.cff-note{margin:0 0 26px;color:var(--fog);font-size:13px;max-width:62ch}
+.cff-h{
+  font:600 11px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--fog);
+  display:flex;align-items:center;gap:10px;margin:30px 0 14px;
+}
+.cff-h:first-of-type{margin-top:0}
+.cff-h span.c{color:var(--area-c,var(--gold-2))}
+.cff-h span.n{font-size:10px;opacity:.7}
+.cff-h::after{content:"";flex:1;height:1px;background:var(--line)}
+.cff-grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(min(280px,100%),1fr))}
+.cff-card{
+  display:grid;gap:6px;padding:16px;text-decoration:none;color:inherit;
+  background:var(--void-3);border:1px solid var(--line);border-radius:var(--r);
+  border-top:2px solid var(--area-c,var(--gold-2));
+}
+.cff-card:hover{border-color:var(--area-c,var(--gold-2))}
+.cff-card .id{font:600 10px/1 var(--mono);letter-spacing:.1em;color:var(--area-c,var(--gold-2))}
+.cff-card .t{font:600 15.5px/1.25 var(--display);color:var(--ink)}
+.cff-card .d{font-size:12.5px;line-height:1.5;color:var(--ink-dim)}
 /* ---- nosotros ---- */
 #nosotros{position:relative;overflow:hidden}
 .nosotros-grid{position:relative;z-index:1;display:grid;grid-template-columns:1.3fr 1fr;gap:60px;align-items:start}
@@ -591,7 +611,7 @@ h1,h2,h3{font-family:var(--display);margin:0;letter-spacing:-.01em}
       <nav class="cat-tabs" id="catTabs" aria-label="Categorías del portafolio"></nav>
     </div>
 
-    <div class="car-stage-outer wrap">
+    <div class="car-stage-outer wrap" id="carStageOuter">
       <div class="car-stage" id="carStage">
         <canvas id="carCanvas"></canvas>
         <div class="car-hint" id="carHint">◂ arrastra para girar ▸</div>
@@ -600,7 +620,7 @@ h1,h2,h3{font-family:var(--display);margin:0;letter-spacing:-.01em}
       <button class="car-nav next" id="carNext" aria-label="Proyecto siguiente">›</button>
     </div>
 
-    <div class="wrap">
+    <div class="wrap" id="carDetailWrap">
       <div class="car-detail" id="carDetail">
         <div class="car-detail-main" aria-live="polite">
           <div class="car-detail-top">
@@ -614,6 +634,8 @@ h1,h2,h3{font-family:var(--display);margin:0;letter-spacing:-.01em}
         <a class="car-open" id="carOpen" href="#" target="_blank" rel="noopener">Abrir la demo</a>
       </div>
     </div>
+
+    <div class="car-fallback wrap" id="carFallback" hidden></div>
   </section>
   <section class="beat" id="nosotros">
     <div class="marca-agua" id="marcaAgua" aria-hidden="true"></div>
@@ -974,10 +996,52 @@ function initHero3D(){
   }
   raf = requestAnimationFrame(frame);
 }
+function renderFallback(){
+  const host = $('#carFallback');
+  if (!host || host.dataset.rendered) return;
+  host.dataset.rendered = '1';
+
+  const nota = document.createElement('p');
+  nota.className = 'cff-note';
+  nota.textContent = 'El carrusel necesita descargar su motor 3D y no respondió a tiempo. Aquí está el mismo portafolio en lista.';
+  host.appendChild(nota);
+
+  Object.keys(AREAS).forEach(key => {
+    const area = AREAS[key];
+    const items = PROYECTOS.filter(p => p.area === key);
+    if (!items.length) return;
+
+    const h = document.createElement('h3');
+    h.className = 'cff-h';
+    h.style.setProperty('--area-c', area.color);
+    h.innerHTML = '<span class="c">' + area.nombre + '</span><span class="n">' + items.length + '</span>';
+    host.appendChild(h);
+
+    const grid = document.createElement('div');
+    grid.className = 'cff-grid';
+    items.forEach(p => {
+      const card = document.createElement('a');
+      card.className = 'cff-card';
+      card.href = p.file;
+      card.style.setProperty('--area-c', area.color);
+      const id = document.createElement('span'); id.className = 'id'; id.textContent = p.id;
+      const t = document.createElement('span'); t.className = 't'; t.textContent = p.title;
+      const d = document.createElement('span'); d.className = 'd'; d.textContent = p.tagline;
+      card.append(id, t, d);
+      grid.appendChild(card);
+    });
+    host.appendChild(grid);
+  });
+
+  host.hidden = false;
+  const outer = $('#carStageOuter'), detail = $('#carDetailWrap');
+  if (outer) outer.hidden = true;
+  if (detail) detail.hidden = true;
+}
 function initCarousel(){
   const stage = $('#carStage');
   const canvas = $('#carCanvas');
-  if (!stage || !canvas || typeof THREE === 'undefined' || !PROYECTOS.length) return;
+  if (!stage || !canvas || typeof THREE === 'undefined' || !PROYECTOS.length) { renderFallback(); return; }
 
   const elIdx = $('#carIdx'), elArea = $('#carArea'), elTitle = $('#carTitle'),
         elTag = $('#carTagline'), elStack = $('#carStack'), elOpen = $('#carOpen'),
@@ -985,7 +1049,7 @@ function initCarousel(){
 
   let renderer;
   try { renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: 'low-power' }); }
-  catch (e) { stage.style.display = 'none'; return; }
+  catch (e) { renderFallback(); return; }
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
 
   const scene = new THREE.Scene();
