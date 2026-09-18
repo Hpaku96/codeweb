@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Panel de ventas de la distribuidora · CODE</title>
+<meta name="description" content="Doce meses de venta por vendedor y línea de producto: acumulados, margen, variación contra el mes anterior, estacionalidad y ranking, todo filtrable en vivo.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20100%20100%22%3E%3Ccircle%20cx%3D%2250%22%20cy%3D%2250%22%20r%3D%2241%22%20fill%3D%22none%22%20stroke%3D%22%2523E7B93D%22%20stroke-width%3D%228%22%2F%3E%3Cg%20fill%3D%22none%22%20stroke%3D%22%2523E7B93D%22%20stroke-width%3D%225%22%20stroke-linecap%3D%22round%22%3E%3Cpath%20d%3D%22M30%2026%20L52%2048%22%2F%3E%3Cpath%20d%3D%22M24%2034%20L40%2050%20L40%2058%22%2F%3E%3Cpath%20d%3D%22M20%2044%20L30%2054%20L30%2064%22%2F%3E%3C%2Fg%3E%3Cg%20fill%3D%22%2523E7B93D%22%3E%3Ccircle%20cx%3D%2252%22%20cy%3D%2248%22%20r%3D%225.5%22%2F%3E%3Ccircle%20cx%3D%2240%22%20cy%3D%2258%22%20r%3D%225.5%22%2F%3E%3Ccircle%20cx%3D%2230%22%20cy%3D%2264%22%20r%3D%225.5%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E">
+<script>(function(){try{var t=localStorage.getItem('code-theme');if(t!=='light'&&t!=='dark'){t=matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';}document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="../assets/demo.css">
+
+</head>
+<body>
+<div class="wrap">
+<header class="demo-head">
+  <a class="brand-bar" href="../index.html">
+    <svg viewBox="0 0 100 100" width="20" height="20" aria-hidden="true">
+      <circle cx="50" cy="50" r="41" fill="none" stroke="currentColor" stroke-width="7"/>
+      <g fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round">
+        <path d="M30 26 L52 48"/>
+        <path d="M24 34 L40 50 L40 58"/>
+        <path d="M20 44 L30 54 L30 64"/>
+      </g>
+      <g fill="currentColor">
+        <circle cx="52" cy="48" r="5"/>
+        <circle cx="40" cy="58" r="5"/>
+        <circle cx="30" cy="64" r="5"/>
+      </g>
+    </svg>
+    <span>CODE</span>
+  </a>
+  <span class="idx">19</span>
+  <h1>Panel de ventas de la distribuidora</h1>
+  <div class="head-actions">
+    <button type="button" class="theme-toggle" id="themeToggle" aria-pressed="false"></button>
+    <a class="back" href="../index.html">← Portafolio</a>
+  </div>
+  <p class="sub">Doce meses de venta por vendedor y línea de producto: acumulados, margen, variación contra el mes anterior, estacionalidad y ranking, todo filtrable en vivo.</p>
+</header>
+<section class="panel" style="margin-bottom:16px">
+  <div class="row">
+    <div class="field" style="min-width:170px"><label for="vend">Vendedor</label><select id="vend"></select></div>
+    <div class="field" style="min-width:170px"><label for="linea">Línea</label><select id="linea"></select></div>
+    <div class="field" style="min-width:170px"><label for="periodo">Periodo</label>
+      <select id="periodo"><option value="12">Año completo</option><option value="6">Últimos 6 meses</option><option value="3">Últimos 3 meses</option></select>
+    </div>
+  </div>
+</section>
+
+<div class="cols" style="margin-bottom:16px">
+  <div class="readout hi"><span class="k">Venta acumulada</span><span class="v" id="kVenta">—</span></div>
+  <div class="readout"><span class="k">Margen bruto</span><span class="v" id="kMargen">—</span><span class="u" id="kMargenPct">—</span></div>
+  <div class="readout"><span class="k">Mejor mes</span><span class="v" id="kMejor">—</span><span class="u" id="kMejorV">—</span></div>
+  <div class="readout"><span class="k">Variación último mes</span><span class="v" id="kVar">—</span></div>
+</div>
+
+<div class="cols-2" style="grid-template-columns:minmax(0,1.4fr) minmax(0,1fr)">
+  <div class="stack">
+    <section class="panel"><h2>Venta y margen por mes</h2><div id="gSerie"></div></section>
+    <section class="panel"><h2>Participación por línea</h2><div id="gLinea"></div></section>
+  </div>
+  <div class="stack">
+    <section class="panel">
+      <h2>Ranking de vendedores</h2>
+      <div class="tablewrap"><table><thead><tr><th>Vendedor</th><th class="num">Venta</th><th class="num">Margen</th><th class="num">Part.</th></tr></thead><tbody id="rank"></tbody></table></div>
+    </section>
+    <section class="panel">
+      <h2>Productos de mayor rotación</h2>
+      <div class="tablewrap" style="max-height:330px;overflow-y:auto"><table><thead><tr><th>Producto</th><th class="num">kg/mes</th><th class="num">Margen u.</th></tr></thead><tbody id="top"></tbody></table></div>
+    </section>
+  </div>
+</div>
+<footer class="demo-foot">
+  <span>CODE · Negocio y comercio · demo 19 de 30</span>
+  <span>JavaScript · SVG · Agregación de datos</span>
+</footer>
+</div>
+<script src="../assets/demo.js"></script>
+<script src="../assets/exportar.js"></script>
+<script src="../assets/datos-comercial.js"></script>
+<script>
+const { $, el, fmt, soles, token, lineChart, barChart, draw, onThemeChange } = CODE;
+const { PRODUCTOS, MESES, VENDEDORES, ventasMensuales } = DATOS;
+
+const DATA = ventasMensuales();
+const LINEAS = Array.from(new Set(DATA.map(d => d.linea)));
+
+function filtrar() {
+  const v = $('#vend').value, l = $('#linea').value, p = +$('#periodo').value;
+  const desde = 12 - p;
+  return DATA.filter(d => (!v || d.vendedor === v) && (!l || d.linea === l) && d.m >= desde);
+}
+
+function render() {
+  const filas = filtrar();
+  const venta = filas.reduce((s, d) => s + d.monto, 0);
+  const margen = filas.reduce((s, d) => s + d.margen, 0);
+
+  const porMes = MESES.map((mes, m) => {
+    const f = filas.filter(d => d.m === m);
+    return { mes, m, monto: f.reduce((s, d) => s + d.monto, 0), margen: f.reduce((s, d) => s + d.margen, 0) };
+  }).filter(x => filas.some(d => d.m === x.m));
+
+  const mejor = porMes.reduce((a, b) => b.monto > a.monto ? b : a, porMes[0] || { mes: '—', monto: 0 });
+  const ult = porMes[porMes.length - 1], pen = porMes[porMes.length - 2];
+  const varPct = pen && pen.monto ? (ult.monto / pen.monto - 1) * 100 : 0;
+
+  $('#kVenta').textContent = soles(venta, 0);
+  $('#kMargen').textContent = soles(margen, 0);
+  $('#kMargenPct').textContent = fmt(margen / (venta || 1) * 100, 1) + ' % sobre la venta';
+  $('#kMejor').textContent = mejor.mes;
+  $('#kMejorV').textContent = soles(mejor.monto, 0);
+  $('#kVar').textContent = (varPct >= 0 ? '+' : '') + fmt(varPct, 1) + ' %';
+  $('#kVar').style.color = varPct >= 0 ? 'var(--good)' : 'var(--bad)';
+
+  draw($('#gSerie'), lineChart({
+    series: [
+      { points: porMes.map((d, i) => [i, d.monto]), color: token('accent'), width: 2.4, dots: 3, fill: 'color-mix(in srgb, ' + token('accent') + ' 14%, transparent)' },
+      { points: porMes.map((d, i) => [i, d.margen]), color: token('blue'), width: 2, dash: '5 4', dots: 2.5 }
+    ],
+    w: 620, h: 280, yMin: 0,
+    xTickVals: porMes.map((_, i) => i),
+    xFmt: i => porMes[i] ? porMes[i].mes : '',
+    yFmt: v => fmt(v / 1000, 0) + 'k',
+    yLabel: 'Soles (miles)'
+  }));
+
+  const porLinea = LINEAS.map(l => ({
+    label: l, value: filas.filter(d => d.linea === l).reduce((s, d) => s + d.monto, 0)
+  }));
+  draw($('#gLinea'), barChart({
+    data: porLinea.map((d, i) => ({ ...d, color: [token('accent'), token('blue'), token('muted')][i % 3] })),
+    w: 620, h: 230, showValues: true, yFmt: v => fmt(v / 1000, 0) + 'k'
+  }));
+
+  const rk = VENDEDORES.map(v => {
+    const f = filas.filter(d => d.vendedor === v);
+    return { v, monto: f.reduce((s, d) => s + d.monto, 0), margen: f.reduce((s, d) => s + d.margen, 0) };
+  }).sort((a, b) => b.monto - a.monto);
+  const tb = $('#rank'); tb.textContent = '';
+  rk.forEach(r => tb.appendChild(el('tr', null, [
+    el('td', { text: r.v }),
+    el('td.num', { text: soles(r.monto, 0) }),
+    el('td.num', { text: soles(r.margen, 0) }),
+    el('td.num', { text: fmt(r.monto / (venta || 1) * 100, 1) + ' %' })
+  ])));
+
+  const top = PRODUCTOS.slice().sort((a, b) => b.rotacion - a.rotacion).slice(0, 12);
+  const tt = $('#top'); tt.textContent = '';
+  top.forEach(p => tt.appendChild(el('tr', null, [
+    el('td', { text: p.nombre, style: 'white-space:normal;min-width:150px' }),
+    el('td.num', { text: fmt(p.rotacion, 0) }),
+    el('td.num', { text: fmt(p.lista - p.costo, 2) })
+  ])));
+}
+
+$('#vend').appendChild(el('option', { value: '', text: 'Todos' }));
+VENDEDORES.forEach(v => $('#vend').appendChild(el('option', { value: v, text: v })));
+$('#linea').appendChild(el('option', { value: '', text: 'Todas' }));
+LINEAS.forEach(l => $('#linea').appendChild(el('option', { value: l, text: l })));
+['#vend', '#linea', '#periodo'].forEach(s => $(s).addEventListener('input', render));
+onThemeChange(render);
+render();
+
+/* ---- exportación de resultados ---- */
+const X = CODE.exportar;
+X.registrar(() => ({
+  titulo: 'Panel de ventas',
+  subtitulo: ($('#vend').value || 'Todos los vendedores') + ' · ' + ($('#linea').value || 'Todas las líneas') +
+    ' · ' + $('#periodo').selectedOptions[0].textContent,
+  resumen: X.desdeReadouts(),
+  tablas: [
+    { titulo: 'Venta y margen por mes', columnas: ['Mes', 'Venta', 'Margen'],
+      filas: MESES.map((mes, m) => {
+        const f = filtrar().filter(d => d.m === m);
+        return f.length ? [mes, f.reduce((s, d) => s + d.monto, 0), f.reduce((s, d) => s + d.margen, 0)] : null;
+      }).filter(Boolean) },
+    X.desdeTbody('#rank', ['Vendedor', 'Venta', 'Margen', 'Participación'], 'Ranking de vendedores')
+  ].filter(t => t.filas.length),
+  nota: 'Series de venta sintéticas generadas con semilla fija.'
+}));
+</script>
+</body>
+</html>

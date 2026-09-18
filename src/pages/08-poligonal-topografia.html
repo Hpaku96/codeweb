@@ -1,0 +1,215 @@
+<!--meta
+{
+  "id": "08",
+  "title": "Cierre y compensación de poligonal",
+  "tagline": "Azimut y distancia de cada lado se convierten en coordenadas, se mide el error de cierre, se compensa por el método de la brújula y se calcula el área por Gauss.",
+  "area": "ingenieria",
+  "stack": ["JavaScript", "Trigonometría", "SVG"],
+  "highlights": [
+    "Compensación de Bowditch repartiendo el error en proporción a la longitud de cada lado",
+    "Área por la fórmula de Gauss sobre las coordenadas ya compensadas",
+    "Dibujo a escala de la poligonal con el error de cierre marcado"
+  ]
+}
+-->
+
+<div class="cols-2" style="grid-template-columns:minmax(0,1.15fr) minmax(0,1fr)">
+  <div class="stack">
+    <section class="panel">
+      <h2>Lados de la poligonal</h2>
+      <div class="tablewrap">
+        <table id="tLados">
+          <thead><tr><th>Lado</th><th class="num">Azimut (°)</th><th class="num">Distancia (m)</th><th class="num">ΔN</th><th class="num">ΔE</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <button class="sm" id="add">+ Lado</button>
+        <span class="chip" id="perim">—</span>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Coordenadas compensadas</h2>
+      <div class="tablewrap">
+        <table id="tCoord">
+          <thead><tr><th>Vértice</th><th class="num">Norte</th><th class="num">Este</th><th class="num">Corr. N</th><th class="num">Corr. E</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <div class="stack">
+    <section class="panel">
+      <h2>Cierre</h2>
+      <div class="cols" style="gap:10px">
+        <div class="readout"><span class="k">Error lineal</span><span class="v" id="err">—</span><span class="u">m</span></div>
+        <div class="readout hi"><span class="k">Precisión</span><span class="v" id="prec">—</span></div>
+      </div>
+      <dl class="kv" style="margin-top:16px">
+        <dt>Error en Norte e<sub>N</sub></dt><dd id="eN">—</dd>
+        <dt>Error en Este e<sub>E</sub></dt><dd id="eE">—</dd>
+        <dt>Azimut del error</dt><dd id="azErr">—</dd>
+        <dt>Perímetro</dt><dd id="per">—</dd>
+        <dt>Área compensada</dt><dd id="area">—</dd>
+        <dt>Área en hectáreas</dt><dd id="areaHa">—</dd>
+      </dl>
+      <div class="row" style="margin-top:14px"><span class="chip" id="verdict">—</span></div>
+      <p class="note" style="margin-top:12px">Tolerancia de referencia: <strong>1 : 5 000</strong> para levantamientos de detalle y <strong>1 : 10 000</strong> para poligonales de apoyo.</p>
+    </section>
+
+    <section class="panel">
+      <h2>Trazo de la poligonal</h2>
+      <div id="dibujo"></div>
+    </section>
+  </div>
+</div>
+
+<script>
+const { $, el, num, fmt, token, draw, svgEl, onThemeChange } = CODE;
+
+let lados = [
+  { az: 45.0, d: 120.00 }, { az: 135.0, d: 100.00 }, { az: 210.0, d: 140.00 },
+  { az: 300.0, d: 90.00 }, { az: 353.0, d: 62.60 }
+];
+
+const rad = g => g * Math.PI / 180;
+function dms(g) {
+  const s = g < 0 ? -1 : 1; g = Math.abs(g);
+  const G = Math.floor(g), M = Math.floor((g - G) * 60), S = ((g - G) * 60 - M) * 60;
+  return (s < 0 ? '-' : '') + G + '° ' + String(M).padStart(2, '0') + "' " + fmt(S, 1) + '"';
+}
+
+function pintarLados() {
+  const tb = $('#tLados tbody'); tb.textContent = '';
+  lados.forEach((l, i) => {
+    const mk = k => {
+      const inp = el('input', { type: 'number', value: l[k], step: k === 'az' ? '0.1' : '0.01', 'aria-label': k + ' lado ' + (i + 1) });
+      inp.addEventListener('input', () => { lados[i][k] = num(inp.value, 0); calcular(); });
+      return inp;
+    };
+    tb.appendChild(el('tr', null, [
+      el('td', { text: String.fromCharCode(65 + i) + '–' + String.fromCharCode(65 + (i + 1) % lados.length) }),
+      el('td.num', null, mk('az')), el('td.num', null, mk('d')),
+      el('td.num', { id: 'dn' + i }), el('td.num', { id: 'de' + i }),
+      el('td', null, el('button.sm.ghost', { text: '✕', title: 'Eliminar', onclick: () => { lados.splice(i, 1); pintarLados(); calcular(); } }))
+    ]));
+  });
+}
+
+function calcular() {
+  if (lados.length < 3) return;
+  const proy = lados.map((l, i) => {
+    const dn = l.d * Math.cos(rad(l.az)), de = l.d * Math.sin(rad(l.az));
+    const cn = $('#dn' + i), ce = $('#de' + i);
+    if (cn) cn.textContent = fmt(dn, 3);
+    if (ce) ce.textContent = fmt(de, 3);
+    return { dn, de, d: l.d };
+  });
+
+  const perim = proy.reduce((s, p) => s + p.d, 0);
+  const eN = proy.reduce((s, p) => s + p.dn, 0);
+  const eE = proy.reduce((s, p) => s + p.de, 0);
+  const err = Math.hypot(eN, eE);
+  const prec = err > 1e-9 ? perim / err : Infinity;
+
+  /* Bowditch: la corrección de cada lado es proporcional a su longitud. */
+  const coord = [{ n: 0, e: 0, cn: 0, ce: 0 }];
+  let cn = 0, ce = 0;
+  proy.forEach(p => {
+    const kn = -eN * p.d / perim, ke = -eE * p.d / perim;
+    cn += kn; ce += ke;
+    const prev = coord[coord.length - 1];
+    coord.push({ n: prev.n + p.dn + kn, e: prev.e + p.de + ke, cn: kn, ce: ke });
+  });
+  coord.pop();
+
+  const tb = $('#tCoord tbody'); tb.textContent = '';
+  coord.forEach((c, i) => tb.appendChild(el('tr', null, [
+    el('td', { text: String.fromCharCode(65 + i) }),
+    el('td.num', { text: fmt(c.n, 3) }), el('td.num', { text: fmt(c.e, 3) }),
+    el('td.num', { text: fmt(c.cn, 4) }), el('td.num', { text: fmt(c.ce, 4) })
+  ])));
+
+  /* Área por Gauss sobre coordenadas compensadas. */
+  let dos = 0;
+  for (let i = 0; i < coord.length; i++) {
+    const a = coord[i], b = coord[(i + 1) % coord.length];
+    dos += a.e * b.n - b.e * a.n;
+  }
+  const area = Math.abs(dos) / 2;
+
+  let azErr = Math.atan2(eE, eN) * 180 / Math.PI; if (azErr < 0) azErr += 360;
+  $('#err').textContent = fmt(err, 4);
+  $('#prec').textContent = err > 1e-9 ? '1 : ' + fmt(prec, 0) : 'Cierre exacto';
+  $('#eN').textContent = fmt(eN, 4) + ' m';
+  $('#eE').textContent = fmt(eE, 4) + ' m';
+  $('#azErr').textContent = dms(azErr);
+  $('#per').textContent = fmt(perim, 3) + ' m';
+  $('#perim').textContent = lados.length + ' lados · ' + fmt(perim, 2) + ' m';
+  $('#area').textContent = fmt(area, 3) + ' m²';
+  $('#areaHa').textContent = fmt(area / 10000, 4) + ' ha';
+
+  const v = $('#verdict');
+  v.className = 'chip ' + (prec >= 10000 ? 'good' : prec >= 5000 ? 'warn' : 'bad');
+  v.textContent = prec >= 10000 ? 'Apto para poligonal de apoyo' : prec >= 5000 ? 'Apto para levantamiento de detalle' : 'Fuera de tolerancia — revisar mediciones';
+
+  dibujar(coord);
+}
+
+function dibujar(coord) {
+  const w = 520, h = 400, pad = 34;
+  const ns = coord.map(c => c.n), es = coord.map(c => c.e);
+  const nMin = Math.min(...ns), nMax = Math.max(...ns), eMin = Math.min(...es), eMax = Math.max(...es);
+  const esc = Math.min((w - 2 * pad) / ((eMax - eMin) || 1), (h - 2 * pad) / ((nMax - nMin) || 1));
+  const cx = (w - (eMax - eMin) * esc) / 2, cy = (h - (nMax - nMin) * esc) / 2;
+  const X = e => cx + (e - eMin) * esc;
+  const Y = n => h - cy - (n - nMin) * esc;
+
+  const svg = svgEl('svg', { class: 'chart', viewBox: `0 0 ${w} ${h}`, role: 'img' });
+  const acc = token('accent'), blue = token('blue'), mut = token('muted');
+
+  const d = coord.map((c, i) => (i ? 'L' : 'M') + X(c.e).toFixed(1) + ' ' + Y(c.n).toFixed(1)).join(' ') + ' Z';
+  svg.appendChild(svgEl('path', { d, fill: 'color-mix(in srgb, ' + blue + ' 12%, transparent)', stroke: blue, 'stroke-width': 2, 'stroke-linejoin': 'round' }));
+
+  coord.forEach((c, i) => {
+    svg.appendChild(svgEl('circle', { cx: X(c.e), cy: Y(c.n), r: 4.5, fill: acc }));
+    const t = svgEl('text', { x: X(c.e) + 9, y: Y(c.n) - 7, fill: mut });
+    t.textContent = String.fromCharCode(65 + i);
+    svg.appendChild(t);
+  });
+
+  const nor = svgEl('g');
+  nor.appendChild(svgEl('line', { x1: w - 26, x2: w - 26, y1: 40, y2: 14, stroke: mut, 'stroke-width': 1.5 }));
+  nor.appendChild(svgEl('path', { d: `M${w - 30} 20 L${w - 26} 12 L${w - 22} 20 Z`, fill: mut }));
+  const nt = svgEl('text', { x: w - 26, y: 52, 'text-anchor': 'middle', fill: mut });
+  nt.textContent = 'N';
+  nor.appendChild(nt);
+  svg.appendChild(nor);
+
+  const esct = svgEl('text', { x: 10, y: h - 8, fill: mut });
+  esct.textContent = 'Escala aprox. 1 : ' + fmt(1 / esc * 100, 0) + ' (cm)';
+  svg.appendChild(esct);
+  draw($('#dibujo'), svg);
+}
+
+$('#add').addEventListener('click', () => { lados.push({ az: 0, d: 50 }); pintarLados(); calcular(); });
+pintarLados();
+onThemeChange(calcular);
+calcular();
+
+/* ---- exportación de resultados ---- */
+const X = CODE.exportar;
+X.registrar(() => ({
+  titulo: 'Cierre y compensación de poligonal',
+  subtitulo: lados.length + ' lados · compensación por el método de la brújula',
+  resumen: X.desdeReadouts().concat(X.desdeKv('.kv'), [{ k: 'Veredicto', v: $('#verdict').textContent }]),
+  tablas: [
+    Object.assign(X.desdeTabla('#tLados'), { titulo: 'Lados de la poligonal' }),
+    Object.assign(X.desdeTabla('#tCoord'), { titulo: 'Coordenadas compensadas' })
+  ],
+  nota: 'El área se calcula por la fórmula de Gauss sobre las coordenadas ya compensadas.'
+}));
+
+</script>

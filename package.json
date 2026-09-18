@@ -1,0 +1,20 @@
+{
+  "name": "code-portafolio",
+  "version": "1.0.0",
+  "description": "Portafolio de 30 proyectos de software: ingeniería, audio, negocio y datos. Exportación a Excel, Word, PDF y CSV, y máquinas de audio con grabación en WAV y MP3.",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "node src/build.mjs",
+    "sprites": "node src/sprites.mjs",
+    "test": "node src/build.mjs && node src/smoke.mjs",
+    "test:export": "node src/probar-exportacion.mjs",
+    "test:audio": "node src/probar-audio.mjs",
+    "test:todo": "node src/build.mjs && node src/smoke.mjs && node src/probar-exportacion.mjs && node src/probar-audio.mjs",
+    "serve": "npx --yes serve ."
+  },
+  "devDependencies": {
+    "playwright": "^1.47.0"
+  },
+  "license": "MIT"
+}

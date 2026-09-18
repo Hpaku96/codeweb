@@ -1,0 +1,205 @@
+<!--meta
+{
+  "id": "02",
+  "title": "Análisis granulométrico y clasificación de suelos",
+  "tagline": "Del peso retenido en cada tamiz a la curva granulométrica, los diámetros característicos y la doble clasificación SUCS y AASHTO con índice de grupo.",
+  "area": "ingenieria",
+  "stack": ["JavaScript", "SVG log", "SUCS / AASHTO"],
+  "highlights": [
+    "Interpolación logarítmica de D10, D30 y D60 sobre la curva real",
+    "Clasificación SUCS con símbolo doble en la franja 5–12 % de finos",
+    "Índice de grupo AASHTO calculado con la fórmula completa"
+  ]
+}
+-->
+
+<div class="cols-2">
+  <div class="stack">
+    <section class="panel">
+      <h2>Pesos retenidos por tamiz</h2>
+      <div class="tablewrap" style="max-height:420px;overflow-y:auto">
+        <table id="tamices">
+          <thead><tr><th>Tamiz</th><th class="num">mm</th><th class="num">Ret. (g)</th><th class="num">% pasa</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div class="row" style="margin-top:12px;justify-content:space-between">
+        <span class="chip" id="total">—</span>
+        <button class="sm" id="reset">Restaurar muestra</button>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Límites de Atterberg</h2>
+      <div class="cols" style="gap:12px">
+        <div class="field"><label for="ll">Límite líquido LL</label><input type="number" id="ll" value="24" min="0" step="1"></div>
+        <div class="field"><label for="lp">Límite plástico LP</label><input type="number" id="lp" value="18" min="0" step="1"></div>
+      </div>
+      <p class="note" style="margin-top:12px">IP = LL − LP = <span id="ip">—</span>. Se usa para separar los finos limosos de los arcillosos y para el índice de grupo.</p>
+    </section>
+  </div>
+
+  <div class="stack">
+    <section class="panel">
+      <h2>Curva granulométrica</h2>
+      <div id="graf"></div>
+    </section>
+
+    <section class="panel">
+      <h2>Clasificación</h2>
+      <div class="cols" style="gap:10px">
+        <div class="readout hi"><span class="k">SUCS</span><span class="v" id="sucs">—</span><span class="u" id="sucsTxt">—</span></div>
+        <div class="readout"><span class="k">AASHTO</span><span class="v" id="aashto">—</span><span class="u" id="aashtoTxt">—</span></div>
+      </div>
+      <dl class="kv" style="margin-top:16px">
+        <dt>D₁₀ · D₃₀ · D₆₀</dt><dd id="ds">—</dd>
+        <dt>Coeficiente de uniformidad C<sub>u</sub></dt><dd id="cu">—</dd>
+        <dt>Coeficiente de curvatura C<sub>c</sub></dt><dd id="cc">—</dd>
+        <dt>Grava / arena / finos</dt><dd id="fracciones">—</dd>
+        <dt>Índice de grupo IG</dt><dd id="ig">—</dd>
+      </dl>
+    </section>
+  </div>
+</div>
+
+<script>
+const { $, el, num, fmt, token, lineChart, draw, onThemeChange } = CODE;
+
+const BASE = [
+  ['2"', 50, 0], ['1 1/2"', 37.5, 60], ['1"', 25, 140], ['3/4"', 19, 180],
+  ['1/2"', 12.5, 220], ['3/8"', 9.5, 160], ['N° 4', 4.75, 280], ['N° 10', 2.0, 250],
+  ['N° 40', 0.425, 320], ['N° 100', 0.15, 180], ['N° 200', 0.075, 130], ['Fondo', 0.01, 80]
+];
+let tamices = BASE.map(t => ({ nombre: t[0], mm: t[1], ret: t[2] }));
+
+function pintarTabla() {
+  const tb = $('#tamices tbody');
+  tb.textContent = '';
+  tamices.forEach((t, i) => {
+    const inp = el('input', { type: 'number', value: t.ret, min: '0', step: '1', 'aria-label': 'retenido ' + t.nombre });
+    inp.addEventListener('input', () => { tamices[i].ret = num(inp.value, 0); calcular(); });
+    tb.appendChild(el('tr', null, [
+      el('td', { text: t.nombre }),
+      el('td.num', { text: t.mm === 0.01 ? '—' : fmt(t.mm, t.mm < 1 ? 3 : 1) }),
+      el('td.num', null, inp),
+      el('td.num', { id: 'p' + i })
+    ]));
+  });
+}
+
+/* Diámetro para un % que pasa dado, interpolando en escala logarítmica. */
+function diametro(curva, objetivo) {
+  for (let i = 0; i < curva.length - 1; i++) {
+    const a = curva[i], b = curva[i + 1];
+    if (a.pasa >= objetivo && b.pasa <= objetivo) {
+      if (a.pasa === b.pasa) return a.mm;
+      const f = (objetivo - b.pasa) / (a.pasa - b.pasa);
+      return Math.pow(10, Math.log10(b.mm) + f * (Math.log10(a.mm) - Math.log10(b.mm)));
+    }
+  }
+  return NaN;
+}
+
+function clasificarSUCS(g, a, f, cu, cc, ll, ip) {
+  const gruesa = g > a;
+  const bienGraduado = gruesa ? (cu >= 4 && cc >= 1 && cc <= 3) : (cu >= 6 && cc >= 1 && cc <= 3);
+  const lineaA = 0.73 * (ll - 20);
+  const fino = ip > 7 && ip > lineaA ? 'C' : 'M';
+  const pref = gruesa ? 'G' : 'S';
+  const nom = gruesa ? 'Grava' : 'Arena';
+  if (f < 5) {
+    const s = pref + (bienGraduado ? 'W' : 'P');
+    return [s, nom + (bienGraduado ? ' bien graduada, limpia' : ' mal graduada, limpia')];
+  }
+  if (f > 12) {
+    const s = pref + fino;
+    return [s, nom + (fino === 'C' ? ' arcillosa' : ' limosa')];
+  }
+  const s = pref + (bienGraduado ? 'W' : 'P') + '-' + pref + fino;
+  return [s, nom + ' con finos — símbolo doble (5–12 % pasa N° 200)'];
+}
+
+function clasificarAASHTO(p10, p40, p200, ll, ip) {
+  if (p200 <= 35) {
+    if (p200 <= 15 && p40 <= 30 && p10 <= 50 && ip <= 6) return ['A-1-a', 'Fragmentos de roca, grava y arena — excelente subrasante'];
+    if (p200 <= 25 && p40 <= 50 && ip <= 6) return ['A-1-b', 'Grava y arena gruesa — excelente subrasante'];
+    if (p200 <= 10 && ip <= 6) return ['A-3', 'Arena fina sin finos plásticos — buena subrasante'];
+    if (ll <= 40 && ip <= 10) return ['A-2-4', 'Granular con finos limosos'];
+    if (ll > 40 && ip <= 10) return ['A-2-5', 'Granular con finos limosos de alta compresibilidad'];
+    if (ll <= 40 && ip > 10) return ['A-2-6', 'Granular con finos arcillosos'];
+    return ['A-2-7', 'Granular con finos arcillosos de alta plasticidad'];
+  }
+  if (ll <= 40 && ip <= 10) return ['A-4', 'Suelo limoso — subrasante regular a mala'];
+  if (ll > 40 && ip <= 10) return ['A-5', 'Limo elástico — subrasante mala'];
+  if (ll <= 40 && ip > 10) return ['A-6', 'Suelo arcilloso — subrasante mala'];
+  return [ip <= ll - 30 ? 'A-7-5' : 'A-7-6', 'Arcilla de alta plasticidad — subrasante mala'];
+}
+
+function calcular() {
+  const total = tamices.reduce((s, t) => s + t.ret, 0);
+  $('#total').textContent = 'Muestra ' + fmt(total, 0) + ' g';
+  if (total <= 0) return;
+
+  let acum = 0;
+  const curva = [];
+  tamices.forEach((t, i) => {
+    acum += t.ret;
+    const pasa = 100 * (1 - acum / total);
+    $('#p' + i).textContent = fmt(pasa, 1);
+    if (t.mm > 0.02) curva.push({ mm: t.mm, pasa });
+  });
+
+  const pasaEn = mm => { const c = curva.find(c => c.mm === mm); return c ? c.pasa : NaN; };
+  const p4 = pasaEn(4.75), p10 = pasaEn(2.0), p40 = pasaEn(0.425), p200 = pasaEn(0.075);
+  const grava = 100 - p4, arena = p4 - p200, finos = p200;
+
+  const d10 = diametro(curva, 10), d30 = diametro(curva, 30), d60 = diametro(curva, 60);
+  const cu = d60 / d10, cc = (d30 * d30) / (d10 * d60);
+
+  const ll = num($('#ll').value, 0), lp = num($('#lp').value, 0);
+  const ip = Math.max(0, ll - lp);
+  $('#ip').textContent = fmt(ip, 0);
+
+  const [s, sTxt] = clasificarSUCS(grava, arena, finos, cu, cc, ll, ip);
+  const [a, aTxt] = clasificarAASHTO(p10, p40, p200, ll, ip);
+  const igRaw = (p200 - 35) * (0.2 + 0.005 * (ll - 40)) + 0.01 * (p200 - 15) * (ip - 10);
+  const ig = Math.max(0, Math.round(igRaw));
+
+  $('#sucs').textContent = s; $('#sucsTxt').textContent = sTxt;
+  $('#aashto').textContent = a + ' (' + ig + ')'; $('#aashtoTxt').textContent = aTxt;
+  $('#ds').textContent = [d10, d30, d60].map(v => Number.isFinite(v) ? fmt(v, 3) : '—').join(' · ') + ' mm';
+  $('#cu').textContent = Number.isFinite(cu) ? fmt(cu, 1) : '—';
+  $('#cc').textContent = Number.isFinite(cc) ? fmt(cc, 2) : '—';
+  $('#fracciones').textContent = [grava, arena, finos].map(v => fmt(v, 1)).join(' / ') + ' %';
+  $('#ig').textContent = ig;
+
+  const marcas = [d10, d30, d60].filter(Number.isFinite).map((d, i) => ({ points: [[d, [10, 30, 60][i]]], color: token('accent'), dots: 4 }));
+  draw($('#graf'), lineChart({
+    series: [{ points: curva.map(c => [c.mm, c.pasa]), color: token('blue'), width: 2.2, dots: 2.5 }].concat(marcas),
+    w: 620, h: 300, logX: true, xMin: 100, xMax: 0.01, yMin: 0, yMax: 100,
+    xTickVals: [100, 10, 1, 0.1, 0.01], yTickVals: [0, 20, 40, 60, 80, 100],
+    xFmt: v => v >= 1 ? String(v) : String(v), yFmt: v => fmt(v, 0),
+    xLabel: 'Abertura del tamiz (mm) — escala logarítmica', yLabel: '% que pasa'
+  }));
+}
+
+$('#reset').addEventListener('click', () => {
+  tamices = BASE.map(t => ({ nombre: t[0], mm: t[1], ret: t[2] }));
+  pintarTabla(); calcular();
+});
+['#ll', '#lp'].forEach(s => $(s).addEventListener('input', calcular));
+pintarTabla();
+onThemeChange(calcular);
+calcular();
+
+/* ---- exportación de resultados ---- */
+const X = CODE.exportar;
+X.registrar(() => ({
+  titulo: 'Análisis granulométrico y clasificación de suelos',
+  subtitulo: 'Curva granulométrica, diámetros característicos y doble clasificación',
+  resumen: X.desdeReadouts().concat(X.desdeKv('.kv')),
+  tablas: [Object.assign(X.desdeTabla('#tamices'), { titulo: 'Pesos retenidos por tamiz' })],
+  nota: 'Los diámetros D10, D30 y D60 se interpolan en escala logarítmica sobre la curva del ensayo.'
+}));
+
+</script>

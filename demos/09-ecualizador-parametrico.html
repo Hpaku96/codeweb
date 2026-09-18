@@ -1,0 +1,318 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>EQ-5 · ecualizador paramétrico · CODE</title>
+<meta name="description" content="Cinco filtros biquad en serie sobre un panel de perillas, con la curva de respuesta calculada en vivo, el espectro de la señal procesada superpuesto y grabación de la salida en WAV o MP3.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20100%20100%22%3E%3Ccircle%20cx%3D%2250%22%20cy%3D%2250%22%20r%3D%2241%22%20fill%3D%22none%22%20stroke%3D%22%2523E7B93D%22%20stroke-width%3D%228%22%2F%3E%3Cg%20fill%3D%22none%22%20stroke%3D%22%2523E7B93D%22%20stroke-width%3D%225%22%20stroke-linecap%3D%22round%22%3E%3Cpath%20d%3D%22M30%2026%20L52%2048%22%2F%3E%3Cpath%20d%3D%22M24%2034%20L40%2050%20L40%2058%22%2F%3E%3Cpath%20d%3D%22M20%2044%20L30%2054%20L30%2064%22%2F%3E%3C%2Fg%3E%3Cg%20fill%3D%22%2523E7B93D%22%3E%3Ccircle%20cx%3D%2252%22%20cy%3D%2248%22%20r%3D%225.5%22%2F%3E%3Ccircle%20cx%3D%2240%22%20cy%3D%2258%22%20r%3D%225.5%22%2F%3E%3Ccircle%20cx%3D%2230%22%20cy%3D%2264%22%20r%3D%225.5%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E">
+<script>(function(){try{var t=localStorage.getItem('code-theme');if(t!=='light'&&t!=='dark'){t=matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';}document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="../assets/demo.css">
+<link rel="stylesheet" href="../assets/maquina.css">
+</head>
+<body>
+<div class="wrap">
+<header class="demo-head">
+  <a class="brand-bar" href="../index.html">
+    <svg viewBox="0 0 100 100" width="20" height="20" aria-hidden="true">
+      <circle cx="50" cy="50" r="41" fill="none" stroke="currentColor" stroke-width="7"/>
+      <g fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round">
+        <path d="M30 26 L52 48"/>
+        <path d="M24 34 L40 50 L40 58"/>
+        <path d="M20 44 L30 54 L30 64"/>
+      </g>
+      <g fill="currentColor">
+        <circle cx="52" cy="48" r="5"/>
+        <circle cx="40" cy="58" r="5"/>
+        <circle cx="30" cy="64" r="5"/>
+      </g>
+    </svg>
+    <span>CODE</span>
+  </a>
+  <span class="idx">09</span>
+  <h1>EQ-5 · ecualizador paramétrico</h1>
+  <div class="head-actions">
+    <button type="button" class="theme-toggle" id="themeToggle" aria-pressed="false"></button>
+    <a class="back" href="../index.html">← Portafolio</a>
+  </div>
+  <p class="sub">Cinco filtros biquad en serie sobre un panel de perillas, con la curva de respuesta calculada en vivo, el espectro de la señal procesada superpuesto y grabación de la salida en WAV o MP3.</p>
+</header>
+<div id="maquina"></div>
+
+<section class="panel">
+  <h2>Cómo se usa</h2>
+  <div class="cols">
+    <p class="note"><strong>Fuente.</strong> Elige ruido rosa para ver la respuesta con claridad, el loop musical para juzgar de oído, o carga tu propio archivo.</p>
+    <p class="note"><strong>Bandas.</strong> Graves y aire son filtros de estantería; las tres del medio son campanas con Q ajustable.</p>
+    <p class="note"><strong>Curva.</strong> La línea dorada es la respuesta real de la cadena; el relleno azulado, el espectro de lo que sale.</p>
+    <p class="note"><strong>Grabación.</strong> Captura la señal ya ecualizada y la exporta sin pasar por ningún servidor.</p>
+  </div>
+</section>
+<footer class="demo-foot">
+  <span>CODE · Audio y música · demo 09 de 30</span>
+  <span>Web Audio API · Canvas · DSP · WAV / MP3</span>
+</footer>
+</div>
+<script src="../assets/demo.js"></script>
+<script src="../assets/exportar.js"></script>
+<script src="../assets/audio.js"></script>
+<script src="../assets/grabar.js"></script>
+<script src="../assets/maquina.js"></script>
+<script>
+const { $, el, fmt } = CODE;
+const A = AUDIO, M = MAQUINA, G = GRABAR;
+
+const BANDAS = [
+  { nombre: 'Graves', tipo: 'lowshelf', f: 90, g: 0, q: 0.7 },
+  { nombre: 'Cuerpo', tipo: 'peaking', f: 240, g: -3, q: 1.1 },
+  { nombre: 'Medios', tipo: 'peaking', f: 1000, g: 1.5, q: 0.9 },
+  { nombre: 'Presencia', tipo: 'peaking', f: 3800, g: 3, q: 1.4 },
+  { nombre: 'Aire', tipo: 'highshelf', f: 11000, g: 2, q: 0.7 }
+];
+
+let fuente = 'rosa', sonando = false, src = null, bufferUsuario = null, makeup = 0;
+let filtros = [], salida = null, analizador = null, datos = null, maestro = null, grabadora = null;
+let lienzo, pantalla, btnPlay, ledSonido, medidorSalida, botonesFuente = {};
+
+/* ================= audio ================= */
+
+async function prepararAudio() {
+  const c = await A.resume();
+  if (!filtros.length) {
+    filtros = BANDAS.map(b => {
+      const f = c.createBiquadFilter();
+      f.type = b.tipo; f.frequency.value = b.f; f.gain.value = b.g; f.Q.value = b.q;
+      return f;
+    });
+    filtros.forEach((f, i) => { if (i) filtros[i - 1].connect(f); });
+    salida = c.createGain();
+    salida.gain.value = Math.pow(10, makeup / 20);
+    analizador = c.createAnalyser();
+    analizador.fftSize = 4096;
+    analizador.smoothingTimeConstant = 0.82;
+    datos = new Float32Array(analizador.frequencyBinCount);
+    maestro = c.createGain();
+    filtros[filtros.length - 1].connect(salida);
+    salida.connect(analizador);
+    analizador.connect(maestro);
+    maestro.connect(c.destination);
+    grabadora = G.grabadora(c, maestro);
+  }
+  return c;
+}
+
+async function reproducir() {
+  const c = await prepararAudio();
+  if (src) { try { src.stop(); } catch (e) {} }
+  src = c.createBufferSource();
+  src.buffer = fuente === 'archivo' && bufferUsuario ? bufferUsuario
+    : fuente === 'loop' ? A.loopArmonico(c, 4) : A.pinkNoise(c, 4);
+  src.loop = true;
+  src.connect(filtros[0]);
+  src.start();
+  sonando = true;
+  btnPlay.encender(true);
+  ledSonido.encender(true);
+  pintarLcd();
+}
+
+function detener() {
+  if (src) { try { src.stop(); } catch (e) {} src = null; }
+  sonando = false;
+  btnPlay.encender(false);
+  ledSonido.encender(false);
+  pintarLcd();
+}
+
+/* Respuesta combinada: se multiplican las magnitudes de cada biquad. Se calcula
+   sobre un contexto offline para que la curva exista antes de activar el audio. */
+const ctxVista = new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(1, 256, 44100);
+const filtrosVista = BANDAS.map(b => {
+  const f = ctxVista.createBiquadFilter();
+  f.type = b.tipo; f.frequency.value = b.f; f.gain.value = b.g; f.Q.value = b.q;
+  return f;
+});
+
+const N = 360;
+const frecs = new Float32Array(N);
+for (let i = 0; i < N; i++) frecs[i] = A.FMIN * Math.pow(A.FMAX / A.FMIN, i / (N - 1));
+
+function respuesta() {
+  const mag = new Float32Array(N).fill(1);
+  const m = new Float32Array(N), p = new Float32Array(N);
+  filtrosVista.forEach((f, i) => {
+    f.frequency.value = BANDAS[i].f; f.gain.value = BANDAS[i].g; f.Q.value = BANDAS[i].q;
+    f.getFrequencyResponse(frecs, m, p);
+    for (let k = 0; k < N; k++) mag[k] *= m[k];
+  });
+  return mag;
+}
+
+/* ================= interfaz ================= */
+
+function construir() {
+  const { maquina, panel } = M.chasis({
+    marca: 'CODE',
+    modelo: 'EQ-5 · parametric equalizer',
+    derecha: [(ledSonido = M.led('Signal', 'verde'))],
+    pie: [el('span', { text: 'Cinco biquads en serie · respuesta medida, no dibujada' })]
+  });
+
+  pantalla = M.lcd(74);
+
+  const transporte = el('div.fila-botones', null, [
+    (btnPlay = M.boton({ texto: '▶ Play', onClick: () => sonando ? detener() : reproducir() })),
+    M.boton({ texto: '■ Stop', onClick: detener }),
+    M.botonArchivo({
+      texto: 'Abrir', pie: 'tu audio', id: 'archEq',
+      onArchivo: async f => {
+        if (!f[0]) return;
+        const c = await prepararAudio();
+        bufferUsuario = await c.decodeAudioData(await f[0].arrayBuffer());
+        fuente = 'archivo';
+        marcarFuente();
+        reproducir();
+      }
+    })
+  ]);
+
+  const fuentes = el('div.fila-botones', { style: 'margin-top:10px' });
+  [['rosa', 'Ruido rosa'], ['loop', 'Loop']].forEach(([clave, texto]) => {
+    const b = M.boton({ texto, onClick: () => { fuente = clave; marcarFuente(); if (sonando) reproducir(); else pintarLcd(); } });
+    botonesFuente[clave] = b;
+    fuentes.appendChild(b);
+  });
+
+  medidorSalida = M.medidor(16);
+  const salidaCtrl = el('div.fila-perillas', null, [
+    M.perilla({
+      nombre: 'Salida', min: -24, max: 12, valor: 0, paso: 0.5,
+      formato: v => (v > 0 ? '+' : '') + fmt(v, 1) + ' dB',
+      onCambio: v => { makeup = v; if (salida) salida.gain.value = Math.pow(10, v / 20); }
+    })
+  ]);
+
+  const rec = M.grabacion({
+    prefijo: 'eq5', ancho: 'sp4',
+    preparar: async () => { await prepararAudio(); if (!sonando) await reproducir(); return grabadora; }
+  });
+
+  panel.appendChild(M.modulo('Fuente', [pantalla, el('div', { style: 'height:10px' }), transporte, fuentes], 'sp5'));
+  panel.appendChild(M.modulo('Salida', [salidaCtrl, el('div', { style: 'height:10px' }), medidorSalida], 'sp3'));
+  panel.appendChild(rec.modulo);
+
+  lienzo = el('canvas.pantalla', { height: 300, style: 'height:300px' });
+  panel.appendChild(M.modulo('Respuesta y espectro', lienzo));
+
+  const bandas = el('div', { style: 'display:flex;flex-wrap:wrap;gap:18px 26px' });
+  BANDAS.forEach((b, i) => {
+    const grupo = el('div', { style: 'display:grid;gap:8px;justify-items:center' }, [
+      el('span', {
+        style: 'font:600 9px var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--m-oro)',
+        text: (i + 1) + ' · ' + b.nombre
+      }),
+      el('div.fila-perillas', { style: 'gap:10px' }, [
+        M.perilla({
+          nombre: 'Frec', min: 20, max: 20000, valor: b.f, log: true, chica: true,
+          formato: v => v >= 1000 ? fmt(v / 1000, 2) + ' k' : fmt(v, 0),
+          onCambio: v => { b.f = v; if (filtros[i]) filtros[i].frequency.value = v; }
+        }),
+        M.perilla({
+          nombre: 'Gan', min: -18, max: 18, valor: b.g, paso: 0.1, chica: true,
+          formato: v => (v > 0 ? '+' : '') + fmt(v, 1),
+          onCambio: v => { b.g = v; if (filtros[i]) filtros[i].gain.value = v; }
+        }),
+        b.tipo === 'peaking' ? M.perilla({
+          nombre: 'Q', min: 0.2, max: 8, valor: b.q, log: true, chica: true,
+          formato: v => fmt(v, 2),
+          onCambio: v => { b.q = v; if (filtros[i]) filtros[i].Q.value = v; }
+        }) : null
+      ].filter(Boolean))
+    ]);
+    bandas.appendChild(grupo);
+  });
+  panel.appendChild(M.modulo('Bandas', bandas));
+
+  $('#maquina').appendChild(maquina);
+  marcarFuente();
+}
+
+function marcarFuente() {
+  Object.entries(botonesFuente).forEach(([clave, b]) => b.encender(clave === fuente));
+  pintarLcd();
+}
+
+function pintarLcd() {
+  const nombre = fuente === 'archivo' ? 'archivo del usuario' : fuente === 'loop' ? 'loop musical' : 'ruido rosa';
+  const activas = BANDAS.filter(b => Math.abs(b.g) > 0.05).length;
+  pantalla.escribir(
+    '<div class="fila"><span class="grande">' + (sonando ? 'PLAY' : 'STOP') + '</span>' +
+    '<span class="tenue">' + (makeup >= 0 ? '+' : '') + fmt(makeup, 1) + ' dB</span></div>' +
+    '<div class="fila"><span class="tenue">' + nombre + '</span>' +
+    '<span class="tenue">' + activas + ' de 5 bandas activas</span></div>'
+  );
+}
+
+/* ================= dibujo ================= */
+
+function pintar() {
+  const t = A.tokens();
+  const { g, w, h } = A.fit(lienzo, 300);
+  const pad = 30, dbMin = -24, dbMax = 24;
+  const tema = { ink: '#e9e4d8', muted: 'rgba(125,240,168,.55)', line: 'rgba(125,240,168,.14)', surface2: '#0d1a12' };
+  A.rejilla(g, w, h, pad, dbMin, dbMax, tema);
+  const Y = db => 8 + (dbMax - db) / (dbMax - dbMin) * (h - 26);
+
+  if (sonando && analizador) {
+    analizador.getFloatFrequencyData(datos);
+    const nyq = A.ctx().sampleRate / 2;
+    g.beginPath();
+    let iniciado = false, pico = -120;
+    for (let i = 1; i < datos.length; i++) {
+      const f = i * nyq / datos.length;
+      if (f < A.FMIN || f > A.FMAX) continue;
+      if (datos[i] > pico) pico = datos[i];
+      const db = Math.max(dbMin, Math.min(dbMax, datos[i] + 78));
+      const x = A.fx(f, w, pad), y = Y(db);
+      iniciado ? g.lineTo(x, y) : (g.moveTo(x, y), iniciado = true);
+    }
+    g.lineTo(w - pad, h - 18); g.lineTo(pad, h - 18); g.closePath();
+    g.fillStyle = 'rgba(125,240,168,.16)'; g.fill();
+    medidorSalida.nivel(pico + 30);
+  } else {
+    medidorSalida.nivel(-60);
+  }
+
+  const mag = respuesta();
+  g.beginPath();
+  for (let i = 0; i < N; i++) {
+    const db = 20 * Math.log10(Math.max(mag[i], 1e-6));
+    const x = A.fx(frecs[i], w, pad), y = Y(Math.max(dbMin, Math.min(dbMax, db)));
+    i ? g.lineTo(x, y) : g.moveTo(x, y);
+  }
+  g.strokeStyle = '#e7b93d'; g.lineWidth = 2.4; g.lineJoin = 'round'; g.stroke();
+
+  g.setLineDash([4, 4]); g.strokeStyle = 'rgba(233,228,216,.3)'; g.lineWidth = 1;
+  g.beginPath(); g.moveTo(pad, Y(0)); g.lineTo(w - pad, Y(0)); g.stroke();
+  g.setLineDash([]);
+
+  BANDAS.forEach((b, i) => {
+    const x = A.fx(b.f, w, pad), y = Y(Math.max(dbMin, Math.min(dbMax, b.g)));
+    g.beginPath(); g.arc(x, y, 6, 0, Math.PI * 2);
+    g.fillStyle = '#e7b93d'; g.fill();
+    g.fillStyle = '#2a2005'; g.font = '600 9px ui-monospace, monospace'; g.textAlign = 'center';
+    g.fillText(String(i + 1), x, y + 3);
+  });
+
+  requestAnimationFrame(pintar);
+}
+
+construir();
+pintarLcd();
+pintar();
+</script>
+</body>
+</html>

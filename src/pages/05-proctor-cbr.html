@@ -1,0 +1,205 @@
+<!--meta
+{
+  "id": "05",
+  "title": "Proctor modificado y ensayo CBR",
+  "tagline": "Ajusta la parábola de compactación para hallar la densidad máxima y el óptimo contenido de humedad, y calcula el CBR al 0.1\" y 0.2\" de penetración.",
+  "area": "ingenieria",
+  "stack": ["JavaScript", "Mínimos cuadrados", "SVG"],
+  "highlights": [
+    "Ajuste cuadrático por mínimos cuadrados y vértice analítico de la parábola",
+    "Curva de saturación (cero vacíos de aire) trazada sobre los puntos del ensayo",
+    "Doble lectura de CBR con la advertencia cuando 0.2\" supera a 0.1\""
+  ]
+}
+-->
+
+<div class="cols-2" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr)">
+  <section class="panel">
+    <h2>Proctor modificado — puntos del ensayo</h2>
+    <div class="tablewrap">
+      <table id="tProctor">
+        <thead><tr><th class="num">w (%)</th><th class="num">γ húmedo (g/cm³)</th><th class="num">γ seco</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="row" style="margin-top:12px">
+      <button class="sm" id="addP">+ Punto</button>
+      <div class="field" style="margin-left:auto;min-width:130px">
+        <label for="gs">Gravedad específica G<sub>s</sub></label>
+        <input type="number" id="gs" value="2.68" step="0.01" min="2.2" max="3">
+      </div>
+    </div>
+    <div class="cols" style="gap:10px;margin-top:14px">
+      <div class="readout hi"><span class="k">γd máx</span><span class="v" id="gdmax">—</span><span class="u">g/cm³</span></div>
+      <div class="readout"><span class="k">Óptimo contenido de humedad</span><span class="v" id="ocs">—</span><span class="u">%</span></div>
+    </div>
+    <div id="gProctor" style="margin-top:14px"></div>
+  </section>
+
+  <section class="panel">
+    <h2>CBR — curva esfuerzo / penetración</h2>
+    <div class="tablewrap">
+      <table id="tCbr">
+        <thead><tr><th class="num">Penetración (")</th><th class="num">Carga (kg)</th><th class="num">Esfuerzo (kg/cm²)</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="field" style="margin-top:12px;max-width:220px">
+      <label for="area">Área del pistón (cm²)</label>
+      <input type="number" id="area" value="19.35" step="0.01">
+    </div>
+    <div class="cols" style="gap:10px;margin-top:14px">
+      <div class="readout"><span class="k">CBR a 0.1"</span><span class="v" id="cbr1">—</span><span class="u">%</span></div>
+      <div class="readout hi"><span class="k">CBR de diseño</span><span class="v" id="cbrd">—</span><span class="u">%</span></div>
+    </div>
+    <div class="row" style="margin-top:12px"><span class="chip" id="aviso">—</span></div>
+    <div id="gCbr" style="margin-top:14px"></div>
+    <p class="note" style="margin-top:12px">Cargas patrón de la piedra triturada: <strong>70.31 kg/cm²</strong> a 0.1" y <strong>105.46 kg/cm²</strong> a 0.2".</p>
+  </section>
+</div>
+
+<script>
+const { $, el, num, fmt, token, lineChart, draw, onThemeChange } = CODE;
+
+let proctor = [
+  { w: 6, gh: 1.95 }, { w: 8, gh: 2.08 }, { w: 10, gh: 2.18 },
+  { w: 12, gh: 2.19 }, { w: 14, gh: 2.13 }
+];
+const cbr = [
+  { p: 0.025, c: 45 }, { p: 0.05, c: 90 }, { p: 0.075, c: 135 }, { p: 0.10, c: 178 },
+  { p: 0.15, c: 245 }, { p: 0.20, c: 300 }, { p: 0.30, c: 380 }, { p: 0.40, c: 430 }, { p: 0.50, c: 470 }
+];
+
+/* Ajuste cuadrático y = ax² + bx + c por mínimos cuadrados (ecuaciones normales 3×3). */
+function ajusteCuadratico(pts) {
+  let S = [0, 0, 0, 0, 0], T = [0, 0, 0];
+  pts.forEach(({ x, y }) => {
+    for (let k = 0; k <= 4; k++) S[k] += Math.pow(x, k);
+    for (let k = 0; k <= 2; k++) T[k] += y * Math.pow(x, k);
+  });
+  const M = [[S[0], S[1], S[2]], [S[1], S[2], S[3]], [S[2], S[3], S[4]]];
+  const b = [T[0], T[1], T[2]];
+  for (let i = 0; i < 3; i++) {
+    let piv = i;
+    for (let r = i + 1; r < 3; r++) if (Math.abs(M[r][i]) > Math.abs(M[piv][i])) piv = r;
+    [M[i], M[piv]] = [M[piv], M[i]]; [b[i], b[piv]] = [b[piv], b[i]];
+    for (let r = 0; r < 3; r++) {
+      if (r === i || Math.abs(M[i][i]) < 1e-12) continue;
+      const f = M[r][i] / M[i][i];
+      for (let c = i; c < 3; c++) M[r][c] -= f * M[i][c];
+      b[r] -= f * b[i];
+    }
+  }
+  const c0 = b[0] / M[0][0], c1 = b[1] / M[1][1], c2 = b[2] / M[2][2];
+  return { a: c2, b: c1, c: c0 };
+}
+
+function pintarProctor() {
+  const tb = $('#tProctor tbody'); tb.textContent = '';
+  proctor.forEach((p, i) => {
+    const mk = k => {
+      const inp = el('input', { type: 'number', value: p[k], step: '0.01', 'aria-label': k + ' punto ' + (i + 1) });
+      inp.addEventListener('input', () => { proctor[i][k] = num(inp.value, 0); calcular(); });
+      return inp;
+    };
+    tb.appendChild(el('tr', null, [
+      el('td.num', null, mk('w')), el('td.num', null, mk('gh')),
+      el('td.num', { id: 'gd' + i }),
+      el('td', null, el('button.sm.ghost', { text: '✕', title: 'Eliminar', onclick: () => { proctor.splice(i, 1); pintarProctor(); calcular(); } }))
+    ]));
+  });
+}
+
+function pintarCbr() {
+  const tb = $('#tCbr tbody'); tb.textContent = '';
+  cbr.forEach((d, i) => {
+    const inp = el('input', { type: 'number', value: d.c, step: '1', 'aria-label': 'carga ' + d.p });
+    inp.addEventListener('input', () => { cbr[i].c = num(inp.value, 0); calcular(); });
+    tb.appendChild(el('tr', null, [
+      el('td.num', { text: fmt(d.p, 3) }), el('td.num', null, inp), el('td.num', { id: 'e' + i })
+    ]));
+  });
+}
+
+function calcular() {
+  const gs = num($('#gs').value, 2.68);
+  const pts = proctor.map((p, i) => {
+    const gd = p.gh / (1 + p.w / 100);
+    const cell = $('#gd' + i); if (cell) cell.textContent = fmt(gd, 3);
+    return { x: p.w, y: gd };
+  }).filter(p => Number.isFinite(p.y) && p.y > 0);
+
+  if (pts.length >= 3) {
+    const { a, b, c } = ajusteCuadratico(pts);
+    const wopt = -b / (2 * a);
+    const gdmax = a * wopt * wopt + b * wopt + c;
+    $('#gdmax').textContent = fmt(gdmax, 3);
+    $('#ocs').textContent = fmt(wopt, 1);
+
+    const wMin = Math.min(...pts.map(p => p.x)) - 1, wMax = Math.max(...pts.map(p => p.x)) + 1;
+    const curva = [], sat = [];
+    for (let w = wMin; w <= wMax; w += 0.2) {
+      curva.push([w, a * w * w + b * w + c]);
+      sat.push([w, gs / (1 + gs * w / 100)]);
+    }
+    draw($('#gProctor'), lineChart({
+      series: [
+        { points: sat, color: token('muted'), width: 1.4, dash: '5 4' },
+        { points: curva, color: token('blue'), width: 2.2 },
+        { points: pts.map(p => [p.x, p.y]), color: token('accent'), dots: 4, width: 0 },
+        { points: [[wopt, gdmax]], color: token('accent'), dots: 6 }
+      ],
+      w: 520, h: 260, xMin: wMin, xMax: wMax,
+      xLabel: 'Contenido de humedad w (%) — línea punteada: cero vacíos de aire',
+      yLabel: 'γ seco (g/cm³)', xFmt: v => fmt(v, 0), yFmt: v => fmt(v, 2)
+    }));
+  }
+
+  const area = num($('#area').value, 19.35);
+  const esf = cbr.map((d, i) => {
+    const e = d.c / area;
+    const cell = $('#e' + i); if (cell) cell.textContent = fmt(e, 2);
+    return [d.p, e];
+  });
+  const en = p => { const f = esf.find(e => Math.abs(e[0] - p) < 1e-6); return f ? f[1] : NaN; };
+  const c1 = en(0.10) / 70.31 * 100, c2 = en(0.20) / 105.46 * 100;
+  $('#cbr1').textContent = fmt(c1, 1);
+  $('#cbrd').textContent = fmt(Math.max(c1, c2), 1);
+  const av = $('#aviso');
+  if (c2 > c1) { av.className = 'chip warn'; av.textContent = 'CBR a 0.2" (' + fmt(c2, 1) + ' %) supera al de 0.1" — corresponde repetir el ensayo'; }
+  else { av.className = 'chip good'; av.textContent = 'Gobierna la lectura de 0.1" — ensayo conforme'; }
+
+  draw($('#gCbr'), lineChart({
+    series: [
+      { points: esf, color: token('accent'), width: 2.2, dots: 3 },
+      { points: [[0.10, en(0.10)], [0.20, en(0.20)]], color: token('blue'), dots: 5, width: 0 }
+    ],
+    w: 520, h: 250, xMin: 0, xMax: 0.5,
+    xLabel: 'Penetración (pulg)', yLabel: 'Esfuerzo (kg/cm²)',
+    xFmt: v => fmt(v, 2), yFmt: v => fmt(v, 0)
+  }));
+}
+
+$('#addP').addEventListener('click', () => {
+  const ult = proctor[proctor.length - 1] || { w: 10, gh: 2 };
+  proctor.push({ w: ult.w + 2, gh: ult.gh }); pintarProctor(); calcular();
+});
+['#gs', '#area'].forEach(s => $(s).addEventListener('input', calcular));
+pintarProctor(); pintarCbr();
+onThemeChange(calcular);
+calcular();
+
+/* ---- exportación de resultados ---- */
+const X = CODE.exportar;
+X.registrar(() => ({
+  titulo: 'Proctor modificado y ensayo CBR',
+  subtitulo: 'Curva de compactación y resistencia a la penetración',
+  resumen: X.desdeReadouts().concat([{ k: 'Conformidad del ensayo', v: $('#aviso').textContent }]),
+  tablas: [
+    Object.assign(X.desdeTabla('#tProctor'), { titulo: 'Puntos del ensayo Proctor' }),
+    Object.assign(X.desdeTabla('#tCbr'), { titulo: 'Curva esfuerzo / penetración' })
+  ],
+  nota: 'La densidad máxima y el óptimo de humedad salen del vértice de la parábola ajustada por mínimos cuadrados.'
+}));
+
+</script>

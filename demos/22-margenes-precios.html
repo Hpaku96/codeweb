@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Márgenes, precios y punto de equilibrio · CODE</title>
+<meta name="description" content="Del costo puesto en almacén al precio de cada canal: flete, merma y comisión entran al costo real, y el gráfico muestra dónde la operación deja de perder dinero.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20100%20100%22%3E%3Ccircle%20cx%3D%2250%22%20cy%3D%2250%22%20r%3D%2241%22%20fill%3D%22none%22%20stroke%3D%22%2523E7B93D%22%20stroke-width%3D%228%22%2F%3E%3Cg%20fill%3D%22none%22%20stroke%3D%22%2523E7B93D%22%20stroke-width%3D%225%22%20stroke-linecap%3D%22round%22%3E%3Cpath%20d%3D%22M30%2026%20L52%2048%22%2F%3E%3Cpath%20d%3D%22M24%2034%20L40%2050%20L40%2058%22%2F%3E%3Cpath%20d%3D%22M20%2044%20L30%2054%20L30%2064%22%2F%3E%3C%2Fg%3E%3Cg%20fill%3D%22%2523E7B93D%22%3E%3Ccircle%20cx%3D%2252%22%20cy%3D%2248%22%20r%3D%225.5%22%2F%3E%3Ccircle%20cx%3D%2240%22%20cy%3D%2258%22%20r%3D%225.5%22%2F%3E%3Ccircle%20cx%3D%2230%22%20cy%3D%2264%22%20r%3D%225.5%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E">
+<script>(function(){try{var t=localStorage.getItem('code-theme');if(t!=='light'&&t!=='dark'){t=matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';}document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="../assets/demo.css">
+
+</head>
+<body>
+<div class="wrap">
+<header class="demo-head">
+  <a class="brand-bar" href="../index.html">
+    <svg viewBox="0 0 100 100" width="20" height="20" aria-hidden="true">
+      <circle cx="50" cy="50" r="41" fill="none" stroke="currentColor" stroke-width="7"/>
+      <g fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round">
+        <path d="M30 26 L52 48"/>
+        <path d="M24 34 L40 50 L40 58"/>
+        <path d="M20 44 L30 54 L30 64"/>
+      </g>
+      <g fill="currentColor">
+        <circle cx="52" cy="48" r="5"/>
+        <circle cx="40" cy="58" r="5"/>
+        <circle cx="30" cy="64" r="5"/>
+      </g>
+    </svg>
+    <span>CODE</span>
+  </a>
+  <span class="idx">22</span>
+  <h1>Márgenes, precios y punto de equilibrio</h1>
+  <div class="head-actions">
+    <button type="button" class="theme-toggle" id="themeToggle" aria-pressed="false"></button>
+    <a class="back" href="../index.html">← Portafolio</a>
+  </div>
+  <p class="sub">Del costo puesto en almacén al precio de cada canal: flete, merma y comisión entran al costo real, y el gráfico muestra dónde la operación deja de perder dinero.</p>
+</header>
+<div class="cols-2" style="grid-template-columns:minmax(0,1fr) minmax(0,1.4fr)">
+  <div class="stack">
+    <section class="panel">
+      <h2>Producto y costos</h2>
+      <fieldset>
+        <div class="field"><label for="prod">Producto del catálogo</label><select id="prod"></select></div>
+        <div class="field"><label for="costo">Costo de compra (S/ por unidad)</label><input type="number" id="costo" value="9.20" step="0.1" min="0"></div>
+        <div class="cols" style="gap:12px">
+          <div class="field"><label for="flete">Flete y manipuleo (%)</label><input type="number" id="flete" value="3.5" step="0.1" min="0"></div>
+          <div class="field"><label for="merma">Merma (%)</label><input type="number" id="merma" value="1.8" step="0.1" min="0"></div>
+          <div class="field"><label for="comision">Comisión de venta (%)</label><input type="number" id="comision" value="2.5" step="0.1" min="0"></div>
+          <div class="field"><label for="fijos">Gastos fijos del mes (S/)</label><input type="number" id="fijos" value="18000" step="500" min="0"></div>
+        </div>
+      </fieldset>
+      <div class="readout hi" style="margin-top:14px"><span class="k">Costo real por unidad</span><span class="v" id="costoReal">—</span></div>
+    </section>
+
+    <section class="panel">
+      <h2>Punto de equilibrio</h2>
+      <div class="field">
+        <label for="precioEq">Precio de venta para el análisis (S/) <span id="precioEqV"></span></label>
+        <input type="range" id="precioEq" min="5" max="60" step="0.1" value="12.9">
+      </div>
+      <dl class="kv" style="margin-top:14px">
+        <dt>Contribución unitaria</dt><dd id="contrib">—</dd>
+        <dt>Unidades para equilibrio</dt><dd id="qEq">—</dd>
+        <dt>Venta para equilibrio</dt><dd id="sEq">—</dd>
+        <dt>Margen sobre la venta</dt><dd id="mVenta">—</dd>
+        <dt>Markup sobre el costo</dt><dd id="mCosto">—</dd>
+      </dl>
+    </section>
+  </div>
+
+  <div class="stack">
+    <section class="panel">
+      <h2>Lista de precios por canal</h2>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Canal</th><th class="num">Margen obj.</th><th class="num">Precio sin IGV</th><th class="num">Precio con IGV</th><th class="num">Contribución</th></tr></thead>
+          <tbody id="canales"></tbody>
+        </table>
+      </div>
+      <p class="note" style="margin-top:12px">Precio = costo real ÷ (1 − margen). Dividir por el complemento del margen —y no multiplicar por él— es lo que diferencia el margen sobre venta del markup sobre costo.</p>
+    </section>
+
+    <section class="panel">
+      <h2>Utilidad según unidades vendidas</h2>
+      <div id="graf"></div>
+    </section>
+  </div>
+</div>
+<footer class="demo-foot">
+  <span>CODE · Negocio y comercio · demo 22 de 30</span>
+  <span>JavaScript · Costeo · SVG</span>
+</footer>
+</div>
+<script src="../assets/demo.js"></script>
+<script src="../assets/exportar.js"></script>
+<script src="../assets/datos-comercial.js"></script>
+<script>
+const { $, el, num, fmt, soles, token, lineChart, draw, onThemeChange } = CODE;
+const { PRODUCTOS } = DATOS;
+
+const CANALES = [
+  { nombre: 'Mayorista / distribuidor', margen: 0.14 },
+  { nombre: 'Food service (restaurantes)', margen: 0.24 },
+  { nombre: 'Minorista / bodega', margen: 0.32 },
+  { nombre: 'Venta directa al público', margen: 0.42 }
+];
+
+function costoReal() {
+  const base = num($('#costo').value, 0);
+  const flete = num($('#flete').value, 0) / 100;
+  const merma = num($('#merma').value, 0) / 100;
+  return base * (1 + flete) / Math.max(0.01, 1 - merma);
+}
+
+function render() {
+  const cr = costoReal();
+  const comision = num($('#comision').value, 0) / 100;
+  const fijos = num($('#fijos').value, 0);
+  $('#costoReal').textContent = soles(cr);
+
+  const tb = $('#canales'); tb.textContent = '';
+  CANALES.forEach(c => {
+    const precio = cr / (1 - c.margen - comision);
+    tb.appendChild(el('tr', null, [
+      el('td', { text: c.nombre, style: 'white-space:normal;min-width:160px' }),
+      el('td.num', { text: fmt(c.margen * 100, 0) + ' %' }),
+      el('td.num', { text: fmt(precio, 2) }),
+      el('td.num', { text: fmt(precio * 1.18, 2) }),
+      el('td.num', { text: fmt(precio - cr - precio * comision, 2) })
+    ]));
+  });
+
+  const precio = num($('#precioEq').value, 12.9);
+  $('#precioEqV').textContent = soles(precio);
+  const contrib = precio - cr - precio * comision;
+  const qEq = contrib > 0 ? fijos / contrib : Infinity;
+  $('#contrib').textContent = soles(contrib);
+  $('#qEq').textContent = Number.isFinite(qEq) ? fmt(qEq, 0) + ' unidades' : 'No alcanza — la contribución es negativa';
+  $('#sEq').textContent = Number.isFinite(qEq) ? soles(qEq * precio, 0) : '—';
+  $('#mVenta').textContent = fmt((precio - cr) / precio * 100, 1) + ' %';
+  $('#mCosto').textContent = fmt((precio - cr) / cr * 100, 1) + ' %';
+
+  const qMax = Number.isFinite(qEq) ? Math.max(qEq * 2, 500) : 4000;
+  const puntos = [];
+  for (let q = 0; q <= qMax; q += qMax / 120) puntos.push([q, q * contrib - fijos]);
+  const series = [
+    { points: puntos, color: token('accent'), width: 2.4 },
+    { points: [[0, 0], [qMax, 0]], color: token('muted'), width: 1, dash: '4 4' }
+  ];
+  if (Number.isFinite(qEq) && qEq <= qMax) series.push({ points: [[qEq, 0]], color: token('blue'), dots: 6 });
+
+  draw($('#graf'), lineChart({
+    series, w: 620, h: 280, xMin: 0, xMax: qMax,
+    xLabel: 'Unidades vendidas en el mes', yLabel: 'Utilidad (S/)',
+    xFmt: v => fmt(v, 0), yFmt: v => fmt(v / 1000, 1) + 'k'
+  }));
+}
+
+PRODUCTOS.forEach(p => $('#prod').appendChild(el('option', { value: p.sku, text: p.nombre + ' — ' + p.marca })));
+$('#prod').addEventListener('input', () => {
+  const p = PRODUCTOS.find(x => x.sku === $('#prod').value);
+  if (!p) return;
+  $('#costo').value = p.costo;
+  $('#precioEq').value = Math.min(60, Math.max(5, p.lista));
+  render();
+});
+['#costo', '#flete', '#merma', '#comision', '#fijos', '#precioEq'].forEach(s => $(s).addEventListener('input', render));
+onThemeChange(render);
+render();
+
+/* ---- exportación de resultados ---- */
+const X = CODE.exportar;
+X.registrar(() => ({
+  titulo: 'Márgenes, precios y punto de equilibrio',
+  subtitulo: 'Costo de compra ' + soles(num($('#costo').value, 0)) + ' por unidad',
+  resumen: X.desdeReadouts().concat(X.desdeKv('.kv')),
+  tablas: [X.desdeTbody('#canales', ['Canal', 'Margen objetivo', 'Precio sin IGV', 'Precio con IGV', 'Contribución'], 'Lista de precios por canal')],
+  nota: 'Precio = costo real ÷ (1 − margen − comisión). El costo real ya incluye flete y merma.'
+}));
+</script>
+</body>
+</html>

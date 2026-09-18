@@ -1,0 +1,298 @@
+<!--meta
+{
+  "id": "10",
+  "title": "COMP-1 · compresor de dinámica",
+  "tagline": "Umbral, ratio, rodilla, ataque y relajación en perillas, sobre una curva de transferencia dibujada con la misma fórmula del compresor, con medidores de entrada, salida y reducción de ganancia.",
+  "area": "audio",
+  "stack": ["Web Audio API", "Canvas", "Dinámica", "WAV / MP3"],
+  "libs": ["../assets/audio.js", "../assets/grabar.js", "../assets/maquina.js"],
+  "estilos": ["../assets/maquina.css"],
+  "highlights": [
+    "Curva de transferencia con rodilla suave calculada, no aproximada",
+    "Punto de operación móvil sobre la curva según el nivel instantáneo de entrada",
+    "Medidores RMS de entrada y salida junto a la reducción de ganancia"
+  ]
+}
+-->
+
+<div id="maquina"></div>
+
+<section class="panel">
+  <h2>Cómo se usa</h2>
+  <div class="cols">
+    <p class="note"><strong>Percusión</strong> es la fuente que mejor muestra el bombeo: golpes fuertes separados por silencio.</p>
+    <p class="note"><strong>Umbral</strong> marca dónde empieza a actuar; <strong>ratio</strong>, cuánto aprieta por encima de ese punto.</p>
+    <p class="note"><strong>Rodilla</strong> suaviza el codo de la curva: con 0 dB la compresión entra de golpe.</p>
+    <p class="note"><strong>Bypass</strong> deja pasar la señal sin tocar, para comparar con el oído y no con la vista.</p>
+  </div>
+</section>
+
+<script>
+const { $, el, fmt } = CODE;
+const A = AUDIO, M = MAQUINA, G = GRABAR;
+
+const P = { threshold: -22, knee: 8, ratio: 4, attack: 0.012, release: 0.22, makeup: 4 };
+let fuente = 'ritmo', sonando = false, bypass = false, bufferUsuario = null;
+let src = null, comp = null, entrada = null, makeup = null, anIn = null, anOut = null;
+let bufIn = null, bufOut = null, maestro = null, grabadora = null;
+let picoIn = -100, picoOut = -100, picoGr = 0;
+let lienzo, pantalla, btnPlay, btnBypass, medIn, medOut, medGr, botonesFuente = {};
+
+/* Patrón percusivo sintetizado: golpes cortos que hacen visible el bombeo. */
+function ritmo(c) {
+  const dur = 4, n = Math.floor(c.sampleRate * dur), buf = c.createBuffer(2, n, c.sampleRate);
+  const golpes = [0, .5, .75, 1, 1.5, 2, 2.5, 2.75, 3, 3.5];
+  for (let ch = 0; ch < 2; ch++) {
+    const d = buf.getChannelData(ch);
+    golpes.forEach((gp, gi) => {
+      const ini = Math.floor(gp * c.sampleRate);
+      const fuerte = gi % 3 === 0;
+      const largo = Math.floor(c.sampleRate * (fuerte ? 0.28 : 0.12));
+      for (let i = 0; i < largo && ini + i < n; i++) {
+        const t = i / c.sampleRate;
+        const env = Math.exp(-(fuerte ? 14 : 34) * t);
+        const cuerpo = Math.sin(2 * Math.PI * (fuerte ? 58 : 190) * t * (1 + (fuerte ? -0.5 : 0) * t));
+        const ruido = (Math.random() * 2 - 1) * (fuerte ? 0.12 : 0.5);
+        d[ini + i] += (cuerpo + ruido) * env * (fuerte ? 0.85 : 0.35);
+      }
+    });
+    for (let i = 0; i < n; i++) {
+      const t = i / c.sampleRate;
+      d[i] += Math.sin(2 * Math.PI * 110 * t) * 0.06 * (0.6 + 0.4 * Math.sin(2 * Math.PI * 0.5 * t));
+      d[i] = Math.max(-1, Math.min(1, d[i]));
+    }
+  }
+  return buf;
+}
+
+async function prepararAudio() {
+  const c = await A.resume();
+  if (!comp) {
+    entrada = c.createGain();
+    comp = c.createDynamicsCompressor();
+    makeup = c.createGain();
+    anIn = c.createAnalyser(); anIn.fftSize = 1024;
+    anOut = c.createAnalyser(); anOut.fftSize = 1024;
+    bufIn = new Float32Array(anIn.fftSize);
+    bufOut = new Float32Array(anOut.fftSize);
+    maestro = c.createGain();
+    aplicar();
+    entrada.connect(anIn);
+    entrada.connect(comp);
+    comp.connect(makeup);
+    makeup.connect(anOut);
+    makeup.connect(maestro);
+    maestro.connect(c.destination);
+    grabadora = G.grabadora(c, maestro);
+  }
+  return c;
+}
+
+function aplicar() {
+  if (!comp) return;
+  comp.threshold.value = bypass ? 0 : P.threshold;
+  comp.knee.value = P.knee;
+  comp.ratio.value = bypass ? 1 : P.ratio;
+  comp.attack.value = P.attack;
+  comp.release.value = P.release;
+  makeup.gain.value = Math.pow(10, (bypass ? 0 : P.makeup) / 20);
+}
+
+async function reproducir() {
+  const c = await prepararAudio();
+  if (src) { try { src.stop(); } catch (e) {} }
+  src = c.createBufferSource();
+  src.buffer = fuente === 'archivo' && bufferUsuario ? bufferUsuario
+    : fuente === 'loop' ? A.loopArmonico(c, 4)
+    : fuente === 'rosa' ? A.pinkNoise(c, 4) : ritmo(c);
+  src.loop = true;
+  src.connect(entrada);
+  src.start();
+  sonando = true;
+  picoIn = picoOut = -100; picoGr = 0;
+  btnPlay.encender(true);
+  pintarLcd();
+}
+
+function detener() {
+  if (src) { try { src.stop(); } catch (e) {} src = null; }
+  sonando = false;
+  btnPlay.encender(false);
+  pintarLcd();
+}
+
+/* Fórmula de transferencia del DynamicsCompressorNode, con rodilla cuadrática. */
+function transferencia(x) {
+  const { threshold: T, knee: K, ratio: R } = P;
+  if (bypass) return x;
+  if (x < T - K / 2) return x;
+  if (K > 0 && x <= T + K / 2) {
+    const d = x - T + K / 2;
+    return x + (1 / R - 1) * d * d / (2 * K);
+  }
+  return T + (x - T) / R;
+}
+
+function rms(buf) {
+  let s = 0;
+  for (let i = 0; i < buf.length; i++) s += buf[i] * buf[i];
+  return 20 * Math.log10(Math.sqrt(s / buf.length) + 1e-9);
+}
+
+/* ================= interfaz ================= */
+
+function construir() {
+  const { maquina, panel } = M.chasis({
+    marca: 'CODE',
+    modelo: 'COMP-1 · dynamics processor',
+    derecha: [M.led('Signal', 'verde')],
+    pie: [el('span', { text: 'Reducción de ganancia leída del propio compresor' })]
+  });
+
+  pantalla = M.lcd(74);
+  const transporte = el('div.fila-botones', null, [
+    (btnPlay = M.boton({ texto: '▶ Play', onClick: () => sonando ? detener() : reproducir() })),
+    M.boton({ texto: '■ Stop', onClick: detener }),
+    (btnBypass = M.boton({
+      texto: 'Bypass', alternar: true,
+      onClick: v => { bypass = v; aplicar(); pintarLcd(); }
+    })),
+    M.botonArchivo({
+      texto: 'Abrir', pie: 'tu audio', id: 'archComp',
+      onArchivo: async f => {
+        if (!f[0]) return;
+        const c = await prepararAudio();
+        bufferUsuario = await c.decodeAudioData(await f[0].arrayBuffer());
+        fuente = 'archivo'; marcarFuente(); reproducir();
+      }
+    })
+  ]);
+
+  const fuentes = el('div.fila-botones', { style: 'margin-top:10px' });
+  [['ritmo', 'Percusión'], ['loop', 'Loop'], ['rosa', 'Ruido']].forEach(([clave, texto]) => {
+    const b = M.boton({ texto, onClick: () => { fuente = clave; marcarFuente(); if (sonando) reproducir(); } });
+    botonesFuente[clave] = b;
+    fuentes.appendChild(b);
+  });
+
+  const perillas = el('div.fila-perillas', null, [
+    M.perilla({ nombre: 'Umbral', min: -60, max: 0, valor: P.threshold, paso: 0.5,
+      formato: v => fmt(v, 1) + ' dB', onCambio: v => { P.threshold = v; aplicar(); } }),
+    M.perilla({ nombre: 'Ratio', min: 1, max: 20, valor: P.ratio, paso: 0.1, log: true,
+      formato: v => fmt(v, 1) + ':1', onCambio: v => { P.ratio = v; aplicar(); } }),
+    M.perilla({ nombre: 'Rodilla', min: 0, max: 40, valor: P.knee, paso: 0.5,
+      formato: v => fmt(v, 1) + ' dB', onCambio: v => { P.knee = v; aplicar(); } }),
+    M.perilla({ nombre: 'Ataque', min: 0.001, max: 0.4, valor: P.attack, log: true,
+      formato: v => fmt(v * 1000, 1) + ' ms', onCambio: v => { P.attack = v; aplicar(); } }),
+    M.perilla({ nombre: 'Relajación', min: 0.02, max: 1.2, valor: P.release, log: true,
+      formato: v => fmt(v * 1000, 0) + ' ms', onCambio: v => { P.release = v; aplicar(); } }),
+    M.perilla({ nombre: 'Salida', min: -6, max: 18, valor: P.makeup, paso: 0.5,
+      formato: v => (v > 0 ? '+' : '') + fmt(v, 1) + ' dB', onCambio: v => { P.makeup = v; aplicar(); } })
+  ]);
+
+  medIn = M.medidor(16); medOut = M.medidor(16); medGr = M.medidor(16);
+  const medicion = el('div.stack', { style: 'gap:9px' }, [
+    el('div', null, [el('span.pie', { text: 'Entrada' }), medIn]),
+    el('div', null, [el('span.pie', { text: 'Salida' }), medOut]),
+    el('div', null, [el('span.pie', { text: 'Reducción de ganancia' }), medGr])
+  ]);
+
+  const rec = M.grabacion({
+    prefijo: 'comp1', ancho: 'sp3',
+    preparar: async () => { await prepararAudio(); if (!sonando) await reproducir(); return grabadora; }
+  });
+
+  panel.appendChild(M.modulo('Fuente', [pantalla, el('div', { style: 'height:10px' }), transporte, fuentes], 'sp5'));
+  panel.appendChild(M.modulo('Medición', medicion, 'sp4'));
+  panel.appendChild(rec.modulo);
+  panel.appendChild(M.modulo('Dinámica', perillas, 'sp5'));
+
+  lienzo = el('canvas.pantalla', { height: 320, style: 'height:320px' });
+  panel.appendChild(M.modulo('Curva de transferencia', lienzo, 'sp7'));
+
+  $('#maquina').appendChild(maquina);
+  marcarFuente();
+}
+
+function marcarFuente() {
+  Object.entries(botonesFuente).forEach(([clave, b]) => b.encender(clave === fuente));
+  pintarLcd();
+}
+
+function pintarLcd() {
+  const gr = comp ? Math.abs(comp.reduction) : 0;
+  pantalla.escribir(
+    '<div class="fila"><span class="grande">' + fmt(gr, 1) + '</span>' +
+    '<span class="tenue">dB de reducción</span></div>' +
+    '<div class="fila"><span class="tenue">' + (bypass ? 'BYPASS' : fmt(P.ratio, 1) + ':1 desde ' + fmt(P.threshold, 0) + ' dB') + '</span>' +
+    '<span class="tenue">' + (sonando ? 'PLAY' : 'STOP') + '</span></div>'
+  );
+}
+
+/* ================= dibujo ================= */
+
+function pintar() {
+  const { g, w, h } = A.fit(lienzo, 320);
+  const pad = 38, min = -60, max = 6;
+  const X = db => pad + (db - min) / (max - min) * (w - 2 * pad);
+  const Y = db => h - pad - (db - min) / (max - min) * (h - 2 * pad);
+
+  g.clearRect(0, 0, w, h);
+  g.fillStyle = '#0d1a12';
+  g.fillRect(0, 0, w, h);
+  g.strokeStyle = 'rgba(125,240,168,.14)'; g.lineWidth = 1;
+  g.font = '10px ui-monospace, monospace'; g.fillStyle = 'rgba(125,240,168,.55)';
+  for (let db = min; db <= max; db += 10) {
+    g.beginPath(); g.moveTo(X(db), pad); g.lineTo(X(db), h - pad); g.stroke();
+    g.beginPath(); g.moveTo(pad, Y(db)); g.lineTo(w - pad, Y(db)); g.stroke();
+    g.textAlign = 'center'; g.fillText(String(db), X(db), h - pad + 14);
+    g.textAlign = 'right'; g.fillText(String(db), pad - 6, Y(db) + 3);
+  }
+
+  g.strokeStyle = 'rgba(233,228,216,.28)'; g.setLineDash([4, 4]);
+  g.beginPath(); g.moveTo(X(min), Y(min)); g.lineTo(X(max), Y(max)); g.stroke();
+  g.setLineDash([]);
+
+  g.beginPath();
+  for (let db = min; db <= max; db += 0.5) {
+    const y = Y(Math.max(min, Math.min(max, transferencia(db) + (bypass ? 0 : P.makeup))));
+    db === min ? g.moveTo(X(db), y) : g.lineTo(X(db), y);
+  }
+  g.strokeStyle = '#e7b93d'; g.lineWidth = 2.6; g.stroke();
+
+  if (!bypass) {
+    g.strokeStyle = 'rgba(125,240,168,.6)'; g.lineWidth = 1.2; g.setLineDash([3, 3]);
+    g.beginPath(); g.moveTo(X(P.threshold), pad); g.lineTo(X(P.threshold), h - pad); g.stroke();
+    g.setLineDash([]);
+    g.fillStyle = 'rgba(125,240,168,.8)'; g.textAlign = 'left';
+    g.fillText('umbral ' + fmt(P.threshold, 0) + ' dB', X(P.threshold) + 6, pad + 14);
+  }
+
+  if (sonando && anIn) {
+    anIn.getFloatTimeDomainData(bufIn);
+    anOut.getFloatTimeDomainData(bufOut);
+    const dbIn = rms(bufIn), dbOut = rms(bufOut);
+    picoIn = Math.max(picoIn, dbIn); picoOut = Math.max(picoOut, dbOut);
+    const gr = comp.reduction;
+    picoGr = Math.min(picoGr, gr);
+    medIn.nivel(dbIn); medOut.nivel(dbOut);
+    medGr.nivel(-60 + Math.abs(gr) * 3);
+    pintarLcd();
+
+    const x = Math.max(min, Math.min(max, dbIn));
+    const y = Math.max(min, Math.min(max, transferencia(x) + (bypass ? 0 : P.makeup)));
+    g.beginPath(); g.arc(X(x), Y(y), 7, 0, Math.PI * 2);
+    g.fillStyle = '#e9e4d8'; g.fill();
+  } else {
+    medIn.nivel(-60); medOut.nivel(-60); medGr.nivel(-60);
+  }
+
+  g.fillStyle = 'rgba(125,240,168,.55)'; g.textAlign = 'center';
+  g.fillText('entrada (dB)', w / 2, h - 8);
+  requestAnimationFrame(pintar);
+}
+
+construir();
+pintarLcd();
+pintar();
+</script>

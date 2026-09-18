@@ -1,0 +1,526 @@
+<!--meta
+{
+  "id": "25",
+  "title": "Motor SQL en el navegador",
+  "tagline": "Un intérprete de SELECT escrito desde cero: tokenizador, análisis descendente recursivo, JOIN, WHERE, GROUP BY con agregados, HAVING, ORDER BY y LIMIT. Sin librerías ni WebAssembly.",
+  "area": "backend",
+  "stack": ["JavaScript", "Parsers", "SQL"],
+  "libs": ["../assets/datos-comercial.js"],
+  "highlights": [
+    "Tokenizador y analizador descendente recursivo con precedencia de operadores real",
+    "Agregados evaluados sobre los grupos, con HAVING aplicado después de agrupar",
+    "El plan de ejecución se muestra tal como quedó el árbol sintáctico"
+  ]
+}
+-->
+
+<section class="panel" style="margin-bottom:16px">
+  <div class="field">
+    <label for="sql">Consulta</label>
+    <textarea id="sql" spellcheck="false" style="min-height:130px;font-size:13.5px">SELECT p.marca, COUNT(*) AS items, ROUND(AVG(p.lista), 2) AS precio_promedio, SUM(p.stock) AS stock_total
+FROM productos p
+WHERE p.linea = 'Lácteos' OR p.costo > 13
+GROUP BY p.marca
+HAVING COUNT(*) >= 2
+ORDER BY stock_total DESC
+LIMIT 10</textarea>
+  </div>
+  <div class="row" style="margin-top:12px">
+    <button class="primary" id="ejecutar">Ejecutar (Ctrl + Enter)</button>
+    <span class="chip" id="estado">—</span>
+    <span class="chip" id="tiempo">—</span>
+  </div>
+</section>
+
+<div class="cols-2" style="grid-template-columns:minmax(0,1fr) minmax(0,2fr)">
+  <div class="stack">
+    <section class="panel">
+      <h2>Tablas</h2>
+      <div id="tablas" class="stack" style="gap:10px"></div>
+    </section>
+    <section class="panel">
+      <h2>Consultas de ejemplo</h2>
+      <div id="ejemplos" class="stack" style="gap:8px"></div>
+    </section>
+  </div>
+
+  <div class="stack">
+    <section class="panel">
+      <h2>Resultado</h2>
+      <div class="tablewrap" style="max-height:420px;overflow:auto"><table id="salida"><thead></thead><tbody></tbody></table></div>
+    </section>
+    <section class="panel">
+      <h2>Plan de ejecución</h2>
+      <div class="console" id="plan" style="max-height:260px"></div>
+    </section>
+  </div>
+</div>
+
+<script>
+const { $, el, fmt } = CODE;
+const { PRODUCTOS, CLIENTES, aleatorio } = DATOS;
+
+/* ---------- datos ---------- */
+const r = aleatorio(4242);
+const pedidos = [];
+const items = [];
+for (let i = 1; i <= 60; i++) {
+  const cli = Math.floor(r() * CLIENTES.length);
+  const mes = 1 + Math.floor(r() * 9);
+  const estado = ['entregado', 'entregado', 'entregado', 'en ruta', 'anulado'][Math.floor(r() * 5)];
+  let total = 0;
+  const n = 1 + Math.floor(r() * 4);
+  for (let k = 0; k < n; k++) {
+    const p = PRODUCTOS[Math.floor(r() * PRODUCTOS.length)];
+    const cant = 1 + Math.floor(r() * 24);
+    const precio = +(p.mayorista * (0.96 + r() * 0.08)).toFixed(2);
+    items.push({ id: items.length + 1, pedido_id: i, sku: p.sku, cantidad: cant, precio_unitario: precio, importe: +(cant * precio).toFixed(2) });
+    total += cant * precio;
+  }
+  pedidos.push({ id: i, cliente_id: cli + 1, fecha: `2026-${String(mes).padStart(2, '0')}-${String(1 + Math.floor(r() * 27)).padStart(2, '0')}`, estado, total: +total.toFixed(2) });
+}
+
+const BASE = {
+  productos: PRODUCTOS.map(p => ({ ...p })),
+  clientes: CLIENTES.map((c, i) => ({ id: i + 1, razon_social: c.nombre, tipo: c.tipo, distrito: c.distrito, vendedor: c.vendedor, estado: c.estado, ticket: c.ticket })),
+  pedidos, pedido_items: items
+};
+
+/* ---------- tokenizador ---------- */
+const PALABRAS = ['SELECT','FROM','WHERE','GROUP','BY','HAVING','ORDER','LIMIT','JOIN','LEFT','INNER','ON','AS','AND','OR','NOT','IN','LIKE','BETWEEN','IS','NULL','ASC','DESC','DISTINCT'];
+
+function lex(sql) {
+  const t = [];
+  let i = 0;
+  while (i < sql.length) {
+    const c = sql[i];
+    if (/\s/.test(c)) { i++; continue; }
+    if (c === '-' && sql[i + 1] === '-') { while (i < sql.length && sql[i] !== '\n') i++; continue; }
+    if (/[0-9]/.test(c) || (c === '.' && /[0-9]/.test(sql[i + 1]))) {
+      let j = i; while (j < sql.length && /[0-9.]/.test(sql[j])) j++;
+      t.push({ k: 'num', v: parseFloat(sql.slice(i, j)) }); i = j; continue;
+    }
+    if (c === "'" || c === '"') {
+      let j = i + 1, s = '';
+      while (j < sql.length && sql[j] !== c) { s += sql[j]; j++; }
+      t.push({ k: 'str', v: s }); i = j + 1; continue;
+    }
+    if (/[A-Za-z_]/.test(c)) {
+      let j = i; while (j < sql.length && /[A-Za-z0-9_.]/.test(sql[j])) j++;
+      const p = sql.slice(i, j);
+      t.push(PALABRAS.includes(p.toUpperCase()) ? { k: 'kw', v: p.toUpperCase() } : { k: 'id', v: p });
+      i = j; continue;
+    }
+    const dos = sql.slice(i, i + 2);
+    if (['<=', '>=', '<>', '!='].includes(dos)) { t.push({ k: 'op', v: dos === '!=' ? '<>' : dos }); i += 2; continue; }
+    if ('+-*/(),=<>'.includes(c)) { t.push({ k: 'op', v: c }); i++; continue; }
+    throw new Error('Carácter inesperado: ' + c);
+  }
+  return t;
+}
+
+/* ---------- analizador ---------- */
+function parse(tokens) {
+  let p = 0;
+  const ver = () => tokens[p];
+  const es = (k, v) => ver() && ver().k === k && (v === undefined || ver().v === v);
+  const come = (k, v) => { if (!es(k, v)) throw new Error('Se esperaba ' + (v || k) + ' y llegó ' + (ver() ? ver().v : 'el final')); return tokens[p++]; };
+  const opcional = (k, v) => es(k, v) ? (p++, true) : false;
+
+  function primaria() {
+    if (es('op', '(')) { p++; const e = expr(); come('op', ')'); return e; }
+    if (es('num') || es('str')) return { k: 'lit', v: tokens[p++].v };
+    if (es('kw', 'NULL')) { p++; return { k: 'lit', v: null }; }
+    if (es('op', '-')) { p++; return { k: 'un', op: '-', e: primaria() }; }
+    if (es('kw', 'NOT')) { p++; return { k: 'un', op: 'NOT', e: comparacion() }; }
+    if (es('id')) {
+      const nombre = tokens[p++].v;
+      if (es('op', '(')) {
+        p++;
+        const args = [];
+        let estrella = false;
+        if (es('op', '*')) { p++; estrella = true; }
+        else if (!es('op', ')')) { args.push(expr()); while (opcional('op', ',')) args.push(expr()); }
+        come('op', ')');
+        return { k: 'fn', nombre: nombre.toUpperCase(), args, estrella };
+      }
+      const partes = nombre.split('.');
+      return partes.length > 1 ? { k: 'col', tabla: partes[0], col: partes[1] } : { k: 'col', col: nombre };
+    }
+    throw new Error('Expresión inválida cerca de ' + (ver() ? ver().v : 'el final'));
+  }
+
+  function multiplicativa() {
+    let l = primaria();
+    while (es('op', '*') || es('op', '/')) { const op = tokens[p++].v; l = { k: 'bin', op, l, r: primaria() }; }
+    return l;
+  }
+  function aditiva() {
+    let l = multiplicativa();
+    while (es('op', '+') || es('op', '-')) { const op = tokens[p++].v; l = { k: 'bin', op, l, r: multiplicativa() }; }
+    return l;
+  }
+  function comparacion() {
+    let l = aditiva();
+    if (es('kw', 'IS')) {
+      p++; const neg = opcional('kw', 'NOT'); come('kw', 'NULL');
+      return { k: 'esNulo', e: l, neg };
+    }
+    const neg = es('kw', 'NOT') && (tokens[p + 1] && ['IN', 'LIKE', 'BETWEEN'].includes(tokens[p + 1].v));
+    if (neg) p++;
+    if (es('kw', 'IN')) {
+      p++; come('op', '(');
+      const lista = [expr()];
+      while (opcional('op', ',')) lista.push(expr());
+      come('op', ')');
+      return { k: 'en', e: l, lista, neg };
+    }
+    if (es('kw', 'LIKE')) { p++; return { k: 'like', e: l, patron: aditiva(), neg }; }
+    if (es('kw', 'BETWEEN')) { p++; const a = aditiva(); come('kw', 'AND'); return { k: 'entre', e: l, a, b: aditiva(), neg }; }
+    while (es('op') && ['=', '<', '>', '<=', '>=', '<>'].includes(ver().v)) {
+      const op = tokens[p++].v; l = { k: 'bin', op, l, r: aditiva() };
+    }
+    return l;
+  }
+  function conjuncion() {
+    let l = comparacion();
+    while (es('kw', 'AND')) { p++; l = { k: 'bin', op: 'AND', l, r: comparacion() }; }
+    return l;
+  }
+  function expr() {
+    let l = conjuncion();
+    while (es('kw', 'OR')) { p++; l = { k: 'bin', op: 'OR', l, r: conjuncion() }; }
+    return l;
+  }
+
+  come('kw', 'SELECT');
+  opcional('kw', 'DISTINCT');
+  const columnas = [];
+  do {
+    if (es('op', '*')) { p++; columnas.push({ estrella: true }); }
+    else {
+      const e = expr();
+      let alias = null;
+      if (opcional('kw', 'AS')) alias = come('id').v;
+      else if (es('id')) alias = tokens[p++].v;
+      columnas.push({ e, alias });
+    }
+  } while (opcional('op', ','));
+
+  come('kw', 'FROM');
+  const from = { tabla: come('id').v };
+  from.alias = es('id') ? tokens[p++].v : from.tabla;
+
+  const joins = [];
+  while (es('kw', 'JOIN') || es('kw', 'LEFT') || es('kw', 'INNER')) {
+    let tipo = 'INNER';
+    if (opcional('kw', 'LEFT')) tipo = 'LEFT';
+    opcional('kw', 'INNER');
+    come('kw', 'JOIN');
+    const tabla = come('id').v;
+    const alias = es('id') ? tokens[p++].v : tabla;
+    come('kw', 'ON');
+    joins.push({ tipo, tabla, alias, on: expr() });
+  }
+
+  let where = null, grupo = null, having = null, orden = null, limite = null;
+  if (opcional('kw', 'WHERE')) where = expr();
+  if (es('kw', 'GROUP')) { p++; come('kw', 'BY'); grupo = [expr()]; while (opcional('op', ',')) grupo.push(expr()); }
+  if (opcional('kw', 'HAVING')) having = expr();
+  if (es('kw', 'ORDER')) {
+    p++; come('kw', 'BY'); orden = [];
+    do {
+      const e = expr();
+      const dir = opcional('kw', 'DESC') ? -1 : (opcional('kw', 'ASC'), 1);
+      orden.push({ e, dir });
+    } while (opcional('op', ','));
+  }
+  if (opcional('kw', 'LIMIT')) limite = come('num').v;
+  if (p < tokens.length) throw new Error('Sobra texto tras la consulta: ' + tokens[p].v);
+  return { columnas, from, joins, where, grupo, having, orden, limite };
+}
+
+/* ---------- ejecución ---------- */
+const AGREGADOS = ['COUNT', 'SUM', 'AVG', 'MIN', 'MAX'];
+
+function valor(nodo, fila, grupo, alias) {
+  switch (nodo.k) {
+    case 'lit': return nodo.v;
+    case 'col': {
+      if (nodo.tabla) return (fila[nodo.tabla] || {})[nodo.col];
+      if (alias && nodo.col in alias) return alias[nodo.col];
+      for (const t in fila) if (fila[t] && nodo.col in fila[t]) return fila[t][nodo.col];
+      return undefined;
+    }
+    case 'un': return nodo.op === '-' ? -valor(nodo.e, fila, grupo, alias) : !verdad(valor(nodo.e, fila, grupo, alias));
+    case 'esNulo': { const v = valor(nodo.e, fila, grupo, alias); return nodo.neg ? v != null : v == null; }
+    case 'en': {
+      const v = valor(nodo.e, fila, grupo, alias);
+      const dentro = nodo.lista.some(x => valor(x, fila, grupo, alias) === v);
+      return nodo.neg ? !dentro : dentro;
+    }
+    case 'like': {
+      const v = String(valor(nodo.e, fila, grupo, alias) ?? '');
+      const pat = String(valor(nodo.patron, fila, grupo, alias) ?? '');
+      const re = new RegExp('^' + pat.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/%/g, '.*').replace(/_/g, '.') + '$', 'i');
+      return nodo.neg ? !re.test(v) : re.test(v);
+    }
+    case 'entre': {
+      const v = valor(nodo.e, fila, grupo, alias);
+      const dentro = v >= valor(nodo.a, fila, grupo, alias) && v <= valor(nodo.b, fila, grupo, alias);
+      return nodo.neg ? !dentro : dentro;
+    }
+    case 'bin': {
+      if (nodo.op === 'AND') return verdad(valor(nodo.l, fila, grupo, alias)) && verdad(valor(nodo.r, fila, grupo, alias));
+      if (nodo.op === 'OR') return verdad(valor(nodo.l, fila, grupo, alias)) || verdad(valor(nodo.r, fila, grupo, alias));
+      const a = valor(nodo.l, fila, grupo, alias), b = valor(nodo.r, fila, grupo, alias);
+      switch (nodo.op) {
+        case '+': return a + b; case '-': return a - b; case '*': return a * b; case '/': return b === 0 ? null : a / b;
+        case '=': return a === b; case '<>': return a !== b;
+        case '<': return a < b; case '>': return a > b; case '<=': return a <= b; case '>=': return a >= b;
+      }
+      return null;
+    }
+    case 'fn': {
+      const n = nodo.nombre;
+      if (AGREGADOS.includes(n)) {
+        const filas = grupo || [fila];
+        if (n === 'COUNT') return nodo.estrella ? filas.length : filas.filter(f => valor(nodo.args[0], f, null, alias) != null).length;
+        const vals = filas.map(f => valor(nodo.args[0], f, null, alias)).filter(v => v != null).map(Number);
+        if (!vals.length) return null;
+        if (n === 'SUM') return vals.reduce((s, v) => s + v, 0);
+        if (n === 'AVG') return vals.reduce((s, v) => s + v, 0) / vals.length;
+        if (n === 'MIN') return Math.min(...vals);
+        return Math.max(...vals);
+      }
+      const args = nodo.args.map(a => valor(a, fila, grupo, alias));
+      if (n === 'ROUND') return Math.round(args[0] * Math.pow(10, args[1] || 0)) / Math.pow(10, args[1] || 0);
+      if (n === 'UPPER') return String(args[0] ?? '').toUpperCase();
+      if (n === 'LOWER') return String(args[0] ?? '').toLowerCase();
+      if (n === 'ABS') return Math.abs(args[0]);
+      if (n === 'COALESCE') return args.find(v => v != null) ?? null;
+      throw new Error('Función desconocida: ' + n);
+    }
+  }
+  return null;
+}
+
+const verdad = v => v !== false && v != null && v !== 0 || v === true;
+const tieneAgregado = n => !n ? false : n.k === 'fn' && AGREGADOS.includes(n.nombre) ? true
+  : ['l', 'r', 'e', 'a', 'b', 'patron'].some(k => n[k] && tieneAgregado(n[k])) || (n.args || []).some(tieneAgregado);
+
+function ejecutar(ast) {
+  const tabla = BASE[ast.from.tabla];
+  if (!tabla) throw new Error('No existe la tabla ' + ast.from.tabla);
+  let filas = tabla.map(r => ({ [ast.from.alias]: r }));
+
+  ast.joins.forEach(j => {
+    const otra = BASE[j.tabla];
+    if (!otra) throw new Error('No existe la tabla ' + j.tabla);
+    const salida = [];
+    filas.forEach(f => {
+      let hubo = false;
+      otra.forEach(o => {
+        const cand = { ...f, [j.alias]: o };
+        if (verdad(valor(j.on, cand, null, null))) { salida.push(cand); hubo = true; }
+      });
+      if (!hubo && j.tipo === 'LEFT') salida.push({ ...f, [j.alias]: {} });
+    });
+    filas = salida;
+  });
+
+  if (ast.where) filas = filas.filter(f => verdad(valor(ast.where, f, null, null)));
+
+  const agregando = ast.grupo || ast.columnas.some(c => c.e && tieneAgregado(c.e));
+  let resultados;
+
+  if (agregando) {
+    const grupos = new Map();
+    filas.forEach(f => {
+      const clave = ast.grupo ? ast.grupo.map(g => JSON.stringify(valor(g, f, null, null))).join('|') : '_';
+      if (!grupos.has(clave)) grupos.set(clave, []);
+      grupos.get(clave).push(f);
+    });
+    resultados = Array.from(grupos.values()).map(g => {
+      const fila = {};
+      ast.columnas.forEach((c, i) => {
+        if (c.estrella) { Object.assign(fila, aplanar(g[0])); return; }
+        fila[c.alias || etiqueta(c.e, i)] = valor(c.e, g[0], g, null);
+      });
+      fila.__grupo = g;
+      return fila;
+    });
+    if (ast.having) resultados = resultados.filter(r => verdad(valor(ast.having, r.__grupo[0], r.__grupo, r)));
+  } else {
+    resultados = filas.map(f => {
+      const fila = {};
+      ast.columnas.forEach((c, i) => {
+        if (c.estrella) { Object.assign(fila, aplanar(f)); return; }
+        fila[c.alias || etiqueta(c.e, i)] = valor(c.e, f, null, null);
+      });
+      fila.__fila = f;
+      return fila;
+    });
+  }
+
+  if (ast.orden) {
+    resultados.sort((a, b) => {
+      for (const o of ast.orden) {
+        const va = valor(o.e, a.__fila || a.__grupo[0], a.__grupo, a);
+        const vb = valor(o.e, b.__fila || b.__grupo[0], b.__grupo, b);
+        if (va > vb) return o.dir;
+        if (va < vb) return -o.dir;
+      }
+      return 0;
+    });
+  }
+  if (ast.limite != null) resultados = resultados.slice(0, ast.limite);
+  return resultados.map(r => { const { __grupo, __fila, ...resto } = r; return resto; });
+}
+
+const aplanar = f => Object.assign({}, ...Object.values(f));
+function etiqueta(e, i) {
+  if (!e) return 'col' + i;
+  if (e.k === 'col') return e.col;
+  if (e.k === 'fn') return e.nombre.toLowerCase() + (e.estrella ? '' : '_' + etiqueta(e.args[0], i));
+  return 'expr' + (i + 1);
+}
+
+function describir(n, sangria) {
+  const s = ' '.repeat(sangria);
+  if (!n) return '';
+  if (n.k === 'col') return s + 'columna ' + (n.tabla ? n.tabla + '.' : '') + n.col;
+  if (n.k === 'lit') return s + 'literal ' + JSON.stringify(n.v);
+  if (n.k === 'fn') return s + 'función ' + n.nombre + (n.estrella ? '(*)' : '') + '\n' + n.args.map(a => describir(a, sangria + 2)).join('\n');
+  if (n.k === 'bin') return s + 'operador ' + n.op + '\n' + describir(n.l, sangria + 2) + '\n' + describir(n.r, sangria + 2);
+  if (n.k === 'like') return s + (n.neg ? 'NOT ' : '') + 'LIKE\n' + describir(n.e, sangria + 2) + '\n' + describir(n.patron, sangria + 2);
+  if (n.k === 'en') return s + (n.neg ? 'NOT ' : '') + 'IN\n' + describir(n.e, sangria + 2);
+  if (n.k === 'entre') return s + 'BETWEEN\n' + describir(n.e, sangria + 2);
+  if (n.k === 'esNulo') return s + 'IS ' + (n.neg ? 'NOT ' : '') + 'NULL\n' + describir(n.e, sangria + 2);
+  if (n.k === 'un') return s + 'unario ' + n.op + '\n' + describir(n.e, sangria + 2);
+  return s + n.k;
+}
+
+function correr() {
+  const t0 = performance.now();
+  try {
+    const ast = parse(lex($('#sql').value));
+    const filas = ejecutar(ast);
+    const ms = performance.now() - t0;
+    pintarTabla(filas);
+    $('#estado').className = 'chip good';
+    $('#estado').textContent = filas.length + (filas.length === 1 ? ' fila' : ' filas');
+    $('#tiempo').textContent = fmt(ms, 2) + ' ms';
+    pintarPlan(ast);
+  } catch (e) {
+    $('#estado').className = 'chip bad';
+    $('#estado').textContent = 'Error';
+    $('#tiempo').textContent = '—';
+    $('#plan').innerHTML = '<span class="c-bad">' + e.message.replace(/</g, '&lt;') + '</span>';
+    pintarTabla([]);
+  }
+}
+
+function pintarTabla(filas) {
+  const t = $('#salida');
+  t.querySelector('thead').textContent = '';
+  t.querySelector('tbody').textContent = '';
+  if (!filas.length) return;
+  const cols = Object.keys(filas[0]);
+  t.querySelector('thead').appendChild(el('tr', null, cols.map(c => el('th', { text: c }))));
+  const tb = t.querySelector('tbody');
+  filas.forEach(f => tb.appendChild(el('tr', null, cols.map(c => {
+    const v = f[c];
+    return el(typeof v === 'number' ? 'td.num' : 'td', { text: v == null ? 'NULL' : typeof v === 'number' ? fmt(v, Number.isInteger(v) ? 0 : 2) : String(v) });
+  }))));
+}
+
+function pintarPlan(ast) {
+  const l = [];
+  l.push('<span class="c-acc">EXPLORAR</span> ' + ast.from.tabla + ' AS ' + ast.from.alias + '  (' + BASE[ast.from.tabla].length + ' filas)');
+  ast.joins.forEach(j => l.push('<span class="c-acc">' + j.tipo + ' JOIN</span> ' + j.tabla + ' AS ' + j.alias + '\n' + describir(j.on, 2)));
+  if (ast.where) l.push('<span class="c-acc">FILTRAR</span>\n' + describir(ast.where, 2));
+  if (ast.grupo) l.push('<span class="c-acc">AGRUPAR POR</span>\n' + ast.grupo.map(g => describir(g, 2)).join('\n'));
+  if (ast.having) l.push('<span class="c-acc">HAVING</span>\n' + describir(ast.having, 2));
+  if (ast.orden) l.push('<span class="c-acc">ORDENAR</span> ' + ast.orden.map(o => etiqueta(o.e, 0) + (o.dir < 0 ? ' DESC' : ' ASC')).join(', '));
+  if (ast.limite != null) l.push('<span class="c-acc">LIMITAR</span> ' + ast.limite);
+  l.push('<span class="c-acc">PROYECTAR</span> ' + ast.columnas.map((c, i) => c.estrella ? '*' : (c.alias || etiqueta(c.e, i))).join(', '));
+  $('#plan').innerHTML = l.join('\n\n');
+}
+
+const EJEMPLOS = [
+  ['Ventas por cliente con JOIN',
+`SELECT c.razon_social, c.distrito, COUNT(*) AS pedidos, ROUND(SUM(pe.total), 2) AS facturado
+FROM pedidos pe
+JOIN clientes c ON pe.cliente_id = c.id
+WHERE pe.estado <> 'anulado'
+GROUP BY c.razon_social, c.distrito
+ORDER BY facturado DESC
+LIMIT 8`],
+  ['Detalle de pedido con dos JOIN',
+`SELECT pe.id, c.razon_social, p.nombre, i.cantidad, i.importe
+FROM pedido_items i
+JOIN pedidos pe ON i.pedido_id = pe.id
+JOIN productos p ON i.sku = p.sku
+JOIN clientes c ON pe.cliente_id = c.id
+WHERE i.importe > 400
+ORDER BY i.importe DESC
+LIMIT 12`],
+  ['Búsqueda con LIKE e IN',
+`SELECT sku, nombre, marca, lista
+FROM productos
+WHERE nombre LIKE '%queso%' OR marca IN ('Cerdeña', 'Delys')
+ORDER BY lista DESC`],
+  ['Margen por producto',
+`SELECT nombre, marca, lista, costo, ROUND((lista - costo) / lista * 100, 1) AS margen_pct
+FROM productos
+WHERE lista > costo
+ORDER BY margen_pct DESC
+LIMIT 10`],
+  ['Rango con BETWEEN',
+`SELECT nombre, stock, rotacion
+FROM productos
+WHERE stock BETWEEN 50 AND 200
+ORDER BY rotacion DESC`]
+];
+
+EJEMPLOS.forEach(([titulo, q]) => {
+  const b = el('button.sm', { text: titulo, style: 'justify-content:flex-start;text-align:left;width:100%' });
+  b.addEventListener('click', () => { $('#sql').value = q; correr(); });
+  $('#ejemplos').appendChild(b);
+});
+
+Object.entries(BASE).forEach(([nombre, filas]) => {
+  $('#tablas').appendChild(el('div', null, [
+    el('div', null, [el('span', { class: 'chip acc', text: nombre }), el('span', { class: 'chip', text: filas.length + ' filas', style: 'margin-left:6px' })]),
+    el('div', { text: Object.keys(filas[0]).join(', '), style: 'font:11px var(--mono);color:var(--muted);margin-top:5px;line-height:1.5' })
+  ]));
+});
+
+$('#ejecutar').addEventListener('click', correr);
+$('#sql').addEventListener('keydown', e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) correr(); });
+correr();
+
+/* ---- exportación de resultados ---- */
+const X = CODE.exportar;
+X.registrar(() => {
+  let filas = [], columnas = [];
+  try {
+    const r = ejecutar(parse(lex($('#sql').value)));
+    columnas = r.length ? Object.keys(r[0]) : [];
+    filas = r.map(f => columnas.map(c => f[c] === null || f[c] === undefined ? '' : f[c]));
+  } catch (e) { /* si la consulta no compila, se exporta solo el enunciado */ }
+  return {
+    titulo: 'Resultado de la consulta',
+    subtitulo: filas.length + ' filas devueltas',
+    resumen: [
+      { k: 'Estado', v: $('#estado').textContent },
+      { k: 'Tiempo de ejecución', v: $('#tiempo').textContent },
+      { k: 'Consulta', v: $('#sql').value.replace(/\s+/g, ' ').slice(0, 300) }
+    ],
+    tablas: filas.length ? [{ titulo: 'Filas', columnas, filas }] : [],
+    nota: 'Consulta resuelta por el intérprete SQL incluido en la página.'
+  };
+});
+
+</script>

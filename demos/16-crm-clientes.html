@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>CRM de cartera y prospectos · CODE</title>
+<meta name="description" content="Tablero de etapas con arrastrar y soltar, ficha del cliente, alerta de visita vencida según su frecuencia de compra y proyección de venta mensual de la cartera.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20100%20100%22%3E%3Ccircle%20cx%3D%2250%22%20cy%3D%2250%22%20r%3D%2241%22%20fill%3D%22none%22%20stroke%3D%22%2523E7B93D%22%20stroke-width%3D%228%22%2F%3E%3Cg%20fill%3D%22none%22%20stroke%3D%22%2523E7B93D%22%20stroke-width%3D%225%22%20stroke-linecap%3D%22round%22%3E%3Cpath%20d%3D%22M30%2026%20L52%2048%22%2F%3E%3Cpath%20d%3D%22M24%2034%20L40%2050%20L40%2058%22%2F%3E%3Cpath%20d%3D%22M20%2044%20L30%2054%20L30%2064%22%2F%3E%3C%2Fg%3E%3Cg%20fill%3D%22%2523E7B93D%22%3E%3Ccircle%20cx%3D%2252%22%20cy%3D%2248%22%20r%3D%225.5%22%2F%3E%3Ccircle%20cx%3D%2240%22%20cy%3D%2258%22%20r%3D%225.5%22%2F%3E%3Ccircle%20cx%3D%2230%22%20cy%3D%2264%22%20r%3D%225.5%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E">
+<script>(function(){try{var t=localStorage.getItem('code-theme');if(t!=='light'&&t!=='dark'){t=matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';}document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="../assets/demo.css">
+
+</head>
+<body>
+<div class="wrap">
+<header class="demo-head">
+  <a class="brand-bar" href="../index.html">
+    <svg viewBox="0 0 100 100" width="20" height="20" aria-hidden="true">
+      <circle cx="50" cy="50" r="41" fill="none" stroke="currentColor" stroke-width="7"/>
+      <g fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round">
+        <path d="M30 26 L52 48"/>
+        <path d="M24 34 L40 50 L40 58"/>
+        <path d="M20 44 L30 54 L30 64"/>
+      </g>
+      <g fill="currentColor">
+        <circle cx="52" cy="48" r="5"/>
+        <circle cx="40" cy="58" r="5"/>
+        <circle cx="30" cy="64" r="5"/>
+      </g>
+    </svg>
+    <span>CODE</span>
+  </a>
+  <span class="idx">16</span>
+  <h1>CRM de cartera y prospectos</h1>
+  <div class="head-actions">
+    <button type="button" class="theme-toggle" id="themeToggle" aria-pressed="false"></button>
+    <a class="back" href="../index.html">← Portafolio</a>
+  </div>
+  <p class="sub">Tablero de etapas con arrastrar y soltar, ficha del cliente, alerta de visita vencida según su frecuencia de compra y proyección de venta mensual de la cartera.</p>
+</header>
+<div class="cols" style="margin-bottom:16px">
+  <div class="readout hi"><span class="k">Venta mensual proyectada</span><span class="v" id="kProy">—</span></div>
+  <div class="readout"><span class="k">Clientes activos</span><span class="v" id="kAct">—</span></div>
+  <div class="readout"><span class="k">Visitas vencidas</span><span class="v" id="kVen">—</span></div>
+  <div class="readout"><span class="k">Prospectos abiertos</span><span class="v" id="kPro">—</span></div>
+</div>
+
+<section class="panel" style="margin-bottom:16px">
+  <div class="row">
+    <div class="field" style="min-width:170px"><label for="vend">Vendedor</label><select id="vend"></select></div>
+    <div class="field" style="min-width:170px"><label for="tipo">Tipo de negocio</label><select id="tipo"></select></div>
+    <div class="field" style="flex:1 1 200px"><label for="q">Buscar</label><input type="search" id="q" placeholder="nombre o distrito"></div>
+  </div>
+</section>
+
+<div id="tablero" style="display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(min(230px,100%),1fr));align-items:start"></div>
+
+<section class="panel" id="ficha" hidden style="margin-top:16px"></section>
+<footer class="demo-foot">
+  <span>CODE · Negocio y comercio · demo 16 de 30</span>
+  <span>JavaScript · Drag and Drop · Estado en memoria</span>
+</footer>
+</div>
+<script src="../assets/demo.js"></script>
+<script src="../assets/exportar.js"></script>
+<script src="../assets/datos-comercial.js"></script>
+<script>
+const { $, $$, el, fmt, soles } = CODE;
+const { CLIENTES, VENDEDORES } = DATOS;
+
+const ETAPAS = ['Prospecto', 'Contactado', 'Propuesta enviada', 'Cliente activo', 'En riesgo'];
+const ETAPA_INICIAL = { 'Prospecto': 'Prospecto', 'Activo': 'Cliente activo', 'En riesgo': 'En riesgo' };
+
+const cartera = CLIENTES.map((c, i) => Object.assign({ id: i, etapa: ETAPA_INICIAL[c.estado], notas: [] }, c));
+cartera[4].etapa = 'Contactado';
+cartera[10].etapa = 'Propuesta enviada';
+cartera[11].etapa = 'Contactado';
+
+let seleccionado = null;
+
+const visibles = () => {
+  const v = $('#vend').value, t = $('#tipo').value, q = $('#q').value.trim().toLowerCase();
+  return cartera.filter(c =>
+    (!v || c.vendedor === v) && (!t || c.tipo === t) &&
+    (!q || (c.nombre + ' ' + c.distrito).toLowerCase().includes(q)));
+};
+
+const vencida = c => c.frecuencia > 0 && c.ultima > c.frecuencia;
+const mensual = c => c.frecuencia > 0 ? c.ticket * (30 / c.frecuencia) : 0;
+
+function pintarTablero() {
+  const cont = $('#tablero'); cont.textContent = '';
+  const lista = visibles();
+  ETAPAS.forEach(etapa => {
+    const dentro = lista.filter(c => c.etapa === etapa);
+    const col = el('section.panel.flat', { 'data-etapa': etapa, style: 'min-height:120px' });
+    col.appendChild(el('h2', null, [
+      etapa, el('span', { class: 'chip', text: String(dentro.length), style: 'margin-left:8px' })
+    ]));
+    const zona = el('div.stack', { style: 'gap:8px' });
+    dentro.forEach(c => zona.appendChild(tarjeta(c)));
+    if (!dentro.length) zona.appendChild(el('p', { text: 'Sin clientes en esta etapa.', style: 'color:var(--muted);font-size:12px;margin:0' }));
+    col.appendChild(zona);
+
+    col.addEventListener('dragover', e => { e.preventDefault(); col.style.borderColor = 'var(--accent)'; });
+    col.addEventListener('dragleave', () => { col.style.borderColor = ''; });
+    col.addEventListener('drop', e => {
+      e.preventDefault();
+      col.style.borderColor = '';
+      const id = +e.dataTransfer.getData('text/plain');
+      const c = cartera.find(x => x.id === id);
+      if (c) { c.etapa = etapa; render(); }
+    });
+    cont.appendChild(col);
+  });
+}
+
+function tarjeta(c) {
+  const t = el('article', {
+    draggable: 'true', tabindex: '0', 'data-id': c.id,
+    style: 'background:var(--surface);border:1px solid ' + (vencida(c) ? 'var(--warn)' : 'var(--line)') +
+      ';border-radius:var(--r);padding:10px;cursor:grab' + (seleccionado === c.id ? ';box-shadow:0 0 0 2px var(--accent)' : '')
+  }, [
+    el('div', { text: c.nombre, style: 'font-weight:600;font-size:13px' }),
+    el('div', { text: c.tipo + ' · ' + c.distrito, style: 'color:var(--muted);font-size:11.5px;margin-top:2px' }),
+    el('div.row', { style: 'gap:6px;margin-top:8px' }, [
+      el('span', { class: 'chip', text: c.vendedor }),
+      c.ticket ? el('span', { class: 'chip acc', text: soles(c.ticket, 0) }) : null,
+      vencida(c) ? el('span', { class: 'chip warn', text: c.ultima + ' d sin comprar' }) : null
+    ])
+  ]);
+  t.addEventListener('dragstart', e => { e.dataTransfer.setData('text/plain', String(c.id)); t.style.opacity = '.5'; });
+  t.addEventListener('dragend', () => { t.style.opacity = '1'; });
+  t.addEventListener('click', () => { seleccionado = c.id; render(); });
+  t.addEventListener('keydown', e => {
+    const i = ETAPAS.indexOf(c.etapa);
+    if (e.key === 'ArrowRight' && i < ETAPAS.length - 1) { c.etapa = ETAPAS[i + 1]; seleccionado = c.id; render(); }
+    if (e.key === 'ArrowLeft' && i > 0) { c.etapa = ETAPAS[i - 1]; seleccionado = c.id; render(); }
+    if (e.key === 'Enter') { seleccionado = c.id; render(); }
+  });
+  return t;
+}
+
+function pintarFicha() {
+  const f = $('#ficha');
+  const c = cartera.find(x => x.id === seleccionado);
+  if (!c) { f.hidden = true; return; }
+  f.hidden = false;
+  f.textContent = '';
+  f.appendChild(el('h2', { text: 'Ficha del cliente' }));
+  f.appendChild(el('div.row', { style: 'justify-content:space-between;align-items:flex-start' }, [
+    el('div', null, [
+      el('div', { text: c.nombre, style: 'font:700 20px var(--cond)' }),
+      el('div', { text: c.tipo + ' · ' + c.distrito + ' · atiende ' + c.vendedor, style: 'color:var(--muted);font-size:13px;margin-top:2px' })
+    ]),
+    el('div.seg', null, ETAPAS.map(e => {
+      const b = el('button', { text: e, 'aria-pressed': String(e === c.etapa) });
+      b.addEventListener('click', () => { c.etapa = e; render(); });
+      return b;
+    }))
+  ]));
+  f.appendChild(el('dl.kv', { style: 'margin-top:16px' }, [
+    el('dt', { text: 'Ticket promedio' }), el('dd', { text: c.ticket ? soles(c.ticket) : 'Sin historial' }),
+    el('dt', { text: 'Frecuencia de compra' }), el('dd', { text: c.frecuencia ? 'cada ' + c.frecuencia + ' días' : '—' }),
+    el('dt', { text: 'Días desde la última compra' }), el('dd', { text: c.frecuencia ? c.ultima + ' días' : '—' }),
+    el('dt', { text: 'Venta mensual estimada' }), el('dd', { text: mensual(c) ? soles(mensual(c)) : '—' }),
+    el('dt', { text: 'Estado de la visita' }), el('dd', { text: c.frecuencia ? (vencida(c) ? 'Vencida hace ' + (c.ultima - c.frecuencia) + ' días' : 'Al día') : 'Por programar' })
+  ]));
+
+  const nota = el('textarea', { placeholder: 'Anotar el resultado de la última visita…', id: 'nota' });
+  const guardar = el('button.primary.sm', { text: 'Registrar nota' });
+  guardar.addEventListener('click', () => {
+    if (!nota.value.trim()) return;
+    c.notas.unshift({ fecha: new Date().toLocaleDateString('es-PE'), texto: nota.value.trim() });
+    render();
+  });
+  f.appendChild(el('div.field', { style: 'margin-top:16px' }, [el('label', { class: 'lbl', for: 'nota', text: 'Seguimiento' }), nota]));
+  f.appendChild(el('div.row', { style: 'margin-top:10px' }, guardar));
+  if (c.notas.length) {
+    f.appendChild(el('div.stack', { style: 'margin-top:14px;gap:8px' }, c.notas.map(n =>
+      el('p.note', { html: '<strong>' + n.fecha + '</strong> · ' + n.texto.replace(/</g, '&lt;') }))));
+  }
+}
+
+function pintarKpis() {
+  const lista = visibles();
+  const activos = lista.filter(c => c.etapa === 'Cliente activo');
+  $('#kProy').textContent = soles(lista.filter(c => c.etapa !== 'Prospecto').reduce((s, c) => s + mensual(c), 0), 0);
+  $('#kAct').textContent = activos.length;
+  $('#kVen').textContent = lista.filter(vencida).length;
+  $('#kPro').textContent = lista.filter(c => ['Prospecto', 'Contactado', 'Propuesta enviada'].includes(c.etapa)).length;
+}
+
+function render() { pintarTablero(); pintarFicha(); pintarKpis(); }
+
+$('#vend').appendChild(el('option', { value: '', text: 'Todos' }));
+VENDEDORES.forEach(v => $('#vend').appendChild(el('option', { value: v, text: v })));
+$('#tipo').appendChild(el('option', { value: '', text: 'Todos' }));
+Array.from(new Set(CLIENTES.map(c => c.tipo))).sort().forEach(t => $('#tipo').appendChild(el('option', { value: t, text: t })));
+['#vend', '#tipo', '#q'].forEach(s => $(s).addEventListener('input', render));
+
+render();
+
+/* ---- exportación de resultados ---- */
+const X = CODE.exportar;
+X.registrar(() => ({
+  titulo: 'Cartera de clientes y prospectos',
+  subtitulo: visibles().length + ' de ' + cartera.length + ' cuentas en la vista actual',
+  resumen: X.desdeReadouts(),
+  tablas: [{
+    titulo: 'Cartera',
+    columnas: ['Cliente', 'Tipo', 'Distrito', 'Vendedor', 'Etapa', 'Ticket', 'Frecuencia (d)', 'Días sin comprar', 'Visita'],
+    filas: visibles().map(c => [c.nombre, c.tipo, c.distrito, c.vendedor, c.etapa,
+      c.ticket ? fmt(c.ticket, 2) : '', c.frecuencia || '', c.frecuencia ? c.ultima : '',
+      c.frecuencia ? (vencida(c) ? 'vencida' : 'al día') : 'por programar'])
+  }],
+  nota: 'Datos sintéticos de demostración.'
+}));
+</script>
+</body>
+</html>

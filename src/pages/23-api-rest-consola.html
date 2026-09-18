@@ -1,0 +1,300 @@
+<!--meta
+{
+  "id": "23",
+  "title": "API REST con consola de pruebas",
+  "tagline": "Un servidor REST completo corriendo en el navegador: autenticación por clave, paginación, filtros, orden, validación de cuerpo y los códigos de estado que corresponden a cada caso.",
+  "area": "backend",
+  "stack": ["JavaScript", "REST", "Validación"],
+  "libs": ["../assets/datos-comercial.js"],
+  "highlights": [
+    "Enrutador con parámetros de ruta, query string y cuerpo JSON, escrito a mano",
+    "Errores con forma consistente: código, mensaje y detalle por campo inválido",
+    "Paginación con metadatos y cabeceras de respuesta, como en un servicio real"
+  ]
+}
+-->
+
+<div class="cols-2" style="grid-template-columns:minmax(0,1fr) minmax(0,1.3fr)">
+  <div class="stack">
+    <section class="panel">
+      <h2>Petición</h2>
+      <div class="row" style="gap:8px;align-items:flex-end">
+        <div class="field" style="min-width:100px"><label for="metodo">Método</label>
+          <select id="metodo"><option>GET</option><option>POST</option><option>PATCH</option><option>DELETE</option></select>
+        </div>
+        <div class="field" style="flex:1 1 200px"><label for="ruta">Ruta</label>
+          <input type="text" id="ruta" value="/v1/productos?linea=Lácteos&limit=3">
+        </div>
+      </div>
+      <div class="field" style="margin-top:12px">
+        <label for="apikey">Cabecera <code>X-API-Key</code></label>
+        <input type="text" id="apikey" value="code_demo_2026">
+      </div>
+      <div class="field" style="margin-top:12px">
+        <label for="cuerpo">Cuerpo JSON (POST y PATCH)</label>
+        <textarea id="cuerpo" spellcheck="false">{
+  "sku": "EMB-999",
+  "nombre": "Chorizo especial",
+  "marca": "Cerdeña",
+  "linea": "Embutidos",
+  "costo": 16.5,
+  "lista": 23.9
+}</textarea>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <button class="primary" id="enviar">Enviar petición</button>
+        <button class="sm" id="limpiar">Limpiar consola</button>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Endpoints disponibles</h2>
+      <div id="docs" class="stack" style="gap:8px"></div>
+    </section>
+  </div>
+
+  <div class="stack">
+    <section class="panel">
+      <h2>Respuesta</h2>
+      <div class="row" style="margin-bottom:10px">
+        <span class="chip" id="estado">—</span>
+        <span class="chip" id="tiempo">—</span>
+        <span class="chip" id="tam">—</span>
+      </div>
+      <div class="console" id="salida" style="max-height:420px"></div>
+    </section>
+    <section class="panel">
+      <h2>Historial</h2>
+      <div class="tablewrap" style="max-height:230px;overflow-y:auto">
+        <table><thead><tr><th>Método</th><th>Ruta</th><th class="num">Estado</th><th class="num">ms</th></tr></thead><tbody id="hist"></tbody></table>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script>
+const { $, el, fmt } = CODE;
+const { PRODUCTOS, CLIENTES } = DATOS;
+
+const CLAVE = 'code_demo_2026';
+const db = {
+  productos: PRODUCTOS.map(p => ({ ...p })),
+  clientes: CLIENTES.map((c, i) => ({ id: i + 1, ...c }))
+};
+
+const ENDPOINTS = [
+  ['GET', '/v1/productos', 'Lista con filtros linea, marca, q, orden, page y limit'],
+  ['GET', '/v1/productos/:sku', 'Un producto por su SKU'],
+  ['POST', '/v1/productos', 'Crea un producto — valida SKU único y campos obligatorios'],
+  ['PATCH', '/v1/productos/:sku', 'Actualiza campos sueltos de un producto'],
+  ['DELETE', '/v1/productos/:sku', 'Elimina un producto'],
+  ['GET', '/v1/clientes', 'Lista de clientes con filtros vendedor, estado y q'],
+  ['GET', '/v1/clientes/:id', 'Un cliente por su identificador'],
+  ['GET', '/v1/reportes/resumen', 'Totales de catálogo y cartera']
+];
+
+/* ---- servidor simulado ---- */
+function servidor(metodo, url, cabeceras, cuerpo) {
+  const [ruta, cadena] = url.split('?');
+  const q = Object.fromEntries(new URLSearchParams(cadena || ''));
+  const partes = ruta.replace(/\/+$/, '').split('/').filter(Boolean);
+
+  if (cabeceras['X-API-Key'] !== CLAVE) {
+    return { estado: 401, cuerpo: { error: 'unauthorized', mensaje: 'Falta o es inválida la cabecera X-API-Key.' } };
+  }
+  if (partes[0] !== 'v1') {
+    return { estado: 404, cuerpo: { error: 'not_found', mensaje: 'Versión de API desconocida. Usa /v1.' } };
+  }
+
+  const recurso = partes[1], id = partes[2];
+
+  if (recurso === 'reportes' && id === 'resumen' && metodo === 'GET') {
+    return { estado: 200, cuerpo: {
+      productos: db.productos.length,
+      valorizado: +db.productos.reduce((s, p) => s + p.stock * p.costo, 0).toFixed(2),
+      clientes: db.clientes.length,
+      activos: db.clientes.filter(c => c.estado === 'Activo').length,
+      generado: new Date().toISOString()
+    } };
+  }
+
+  if (recurso === 'productos') {
+    if (metodo === 'GET' && !id) return listar(db.productos, q, ['nombre', 'marca', 'sku']);
+    if (metodo === 'GET') {
+      const p = db.productos.find(x => x.sku.toLowerCase() === id.toLowerCase());
+      return p ? { estado: 200, cuerpo: p } : noEncontrado('producto', id);
+    }
+    if (metodo === 'POST') {
+      const errores = validar(cuerpo);
+      if (errores.length) return { estado: 422, cuerpo: { error: 'validation_failed', mensaje: 'El cuerpo no pasó la validación.', detalle: errores } };
+      if (db.productos.some(p => p.sku === cuerpo.sku)) {
+        return { estado: 409, cuerpo: { error: 'conflict', mensaje: 'Ya existe un producto con el SKU ' + cuerpo.sku + '.' } };
+      }
+      const nuevo = { stock: 0, rotacion: 0, unidad: 'kg', presentacion: '—', mayorista: +(cuerpo.lista * 0.9).toFixed(2), ...cuerpo };
+      db.productos.push(nuevo);
+      return { estado: 201, cuerpo: nuevo, cabeceras: { Location: '/v1/productos/' + nuevo.sku } };
+    }
+    if (metodo === 'PATCH') {
+      const p = db.productos.find(x => x.sku === id);
+      if (!p) return noEncontrado('producto', id);
+      Object.assign(p, cuerpo);
+      return { estado: 200, cuerpo: p };
+    }
+    if (metodo === 'DELETE') {
+      const i = db.productos.findIndex(x => x.sku === id);
+      if (i < 0) return noEncontrado('producto', id);
+      db.productos.splice(i, 1);
+      return { estado: 204, cuerpo: null };
+    }
+  }
+
+  if (recurso === 'clientes') {
+    if (metodo === 'GET' && !id) return listar(db.clientes, q, ['nombre', 'distrito', 'tipo']);
+    if (metodo === 'GET') {
+      const c = db.clientes.find(x => String(x.id) === id);
+      return c ? { estado: 200, cuerpo: c } : noEncontrado('cliente', id);
+    }
+  }
+
+  return { estado: 405, cuerpo: { error: 'method_not_allowed', mensaje: metodo + ' no está permitido en ' + ruta + '.' } };
+}
+
+function noEncontrado(tipo, id) {
+  return { estado: 404, cuerpo: { error: 'not_found', mensaje: 'No existe el ' + tipo + ' ' + id + '.' } };
+}
+
+function validar(c) {
+  const errores = [];
+  if (!c || typeof c !== 'object') return [{ campo: 'cuerpo', mensaje: 'Se esperaba un objeto JSON.' }];
+  if (!c.sku || !/^[A-Z]{3}-\d{3}$/.test(c.sku)) errores.push({ campo: 'sku', mensaje: 'Formato esperado AAA-000.' });
+  if (!c.nombre || c.nombre.length < 3) errores.push({ campo: 'nombre', mensaje: 'Mínimo 3 caracteres.' });
+  if (typeof c.costo !== 'number' || c.costo <= 0) errores.push({ campo: 'costo', mensaje: 'Debe ser un número mayor que cero.' });
+  if (typeof c.lista !== 'number' || c.lista <= (c.costo || 0)) errores.push({ campo: 'lista', mensaje: 'El precio de lista debe superar al costo.' });
+  return errores;
+}
+
+function listar(coleccion, q, camposBusqueda) {
+  let datos = coleccion.slice();
+  Object.entries(q).forEach(([k, v]) => {
+    if (['page', 'limit', 'orden', 'q'].includes(k)) return;
+    datos = datos.filter(d => String(d[k] ?? '').toLowerCase() === v.toLowerCase());
+  });
+  if (q.q) {
+    const t = q.q.toLowerCase();
+    datos = datos.filter(d => camposBusqueda.some(c => String(d[c] ?? '').toLowerCase().includes(t)));
+  }
+  if (q.orden) {
+    const desc = q.orden.startsWith('-');
+    const campo = desc ? q.orden.slice(1) : q.orden;
+    datos.sort((a, b) => (a[campo] > b[campo] ? 1 : a[campo] < b[campo] ? -1 : 0) * (desc ? -1 : 1));
+  }
+  const limit = Math.min(100, Math.max(1, parseInt(q.limit || '20', 10) || 20));
+  const page = Math.max(1, parseInt(q.page || '1', 10) || 1);
+  const total = datos.length;
+  const pagina = datos.slice((page - 1) * limit, page * limit);
+  return {
+    estado: 200,
+    cabeceras: { 'X-Total-Count': String(total), 'X-Page': String(page) },
+    cuerpo: { datos: pagina, meta: { total, page, limit, paginas: Math.ceil(total / limit) || 1 } }
+  };
+}
+
+/* ---- consola ---- */
+const historial = [];
+
+function colorear(obj) {
+  const json = JSON.stringify(obj, null, 2);
+  return json
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/"([^"]+)":/g, '<span class="c-key">"$1"</span>:')
+    .replace(/: "([^"]*)"/g, ': <span class="c-acc">"$1"</span>')
+    .replace(/: (-?\d+\.?\d*)/g, ': <span class="c-ok">$1</span>')
+    .replace(/: (true|false|null)/g, ': <span class="c-mut">$1</span>');
+}
+
+function enviar() {
+  const metodo = $('#metodo').value;
+  const ruta = $('#ruta').value.trim();
+  const cabeceras = { 'X-API-Key': $('#apikey').value.trim(), 'Content-Type': 'application/json' };
+  let cuerpo = null, errorJson = null;
+  if (['POST', 'PATCH'].includes(metodo)) {
+    try { cuerpo = JSON.parse($('#cuerpo').value); }
+    catch (e) { errorJson = e.message; }
+  }
+
+  const t0 = performance.now();
+  const r = errorJson
+    ? { estado: 400, cuerpo: { error: 'bad_json', mensaje: 'El cuerpo no es JSON válido.', detalle: errorJson } }
+    : servidor(metodo, ruta, cabeceras, cuerpo);
+  const ms = performance.now() - t0 + Math.random() * 12 + 4;
+
+  const clase = r.estado < 300 ? 'good' : r.estado < 400 ? '' : r.estado < 500 ? 'warn' : 'bad';
+  $('#estado').className = 'chip ' + clase;
+  $('#estado').textContent = r.estado + ' ' + textoEstado(r.estado);
+  $('#tiempo').textContent = fmt(ms, 1) + ' ms';
+  const texto = r.cuerpo === null ? '' : JSON.stringify(r.cuerpo);
+  $('#tam').textContent = fmt(texto.length / 1024, 2) + ' KB';
+
+  const salida = $('#salida');
+  const cab = Object.entries({ 'Content-Type': 'application/json; charset=utf-8', ...(r.cabeceras || {}) })
+    .map(([k, v]) => '<span class="c-mut">' + k + ':</span> ' + v).join('\n');
+  salida.insertAdjacentHTML('afterbegin',
+    '<div style="border-bottom:1px solid var(--line-soft);padding-bottom:10px;margin-bottom:10px">' +
+    '<span class="c-acc">' + metodo + '</span> ' + ruta.replace(/</g, '&lt;') + '\n' + cab + '\n\n' +
+    (r.cuerpo === null ? '<span class="c-mut">(sin contenido)</span>' : colorear(r.cuerpo)) + '</div>');
+
+  historial.unshift({ metodo, ruta, estado: r.estado, ms });
+  pintarHistorial();
+}
+
+function textoEstado(c) {
+  return { 200: 'OK', 201: 'Created', 204: 'No Content', 400: 'Bad Request', 401: 'Unauthorized', 404: 'Not Found', 405: 'Method Not Allowed', 409: 'Conflict', 422: 'Unprocessable Entity' }[c] || '';
+}
+
+function pintarHistorial() {
+  const tb = $('#hist'); tb.textContent = '';
+  historial.slice(0, 25).forEach(h => tb.appendChild(el('tr', null, [
+    el('td', { text: h.metodo }),
+    el('td', { text: h.ruta, style: 'white-space:normal;max-width:240px' }),
+    el('td.num', { text: h.estado }),
+    el('td.num', { text: fmt(h.ms, 1) })
+  ])));
+}
+
+ENDPOINTS.forEach(([m, ruta, desc]) => {
+  const b = el('button', { style: 'justify-content:flex-start;text-align:left;width:100%;flex-direction:column;align-items:flex-start;gap:4px' }, [
+    el('span', null, [el('span', { class: 'chip acc', text: m }), ' ', el('code', { text: ruta })]),
+    el('span', { text: desc, style: 'font-size:11.5px;color:var(--muted);font-weight:400' })
+  ]);
+  b.addEventListener('click', () => {
+    $('#metodo').value = m;
+    $('#ruta').value = ruta.replace(':sku', 'LAC-403').replace(':id', '3');
+    enviar();
+  });
+  $('#docs').appendChild(b);
+});
+
+$('#enviar').addEventListener('click', enviar);
+$('#limpiar').addEventListener('click', () => { $('#salida').textContent = ''; });
+enviar();
+
+/* ---- exportación de resultados ---- */
+const X = CODE.exportar;
+X.registrar(() => ({
+  titulo: 'Bitácora de peticiones a la API',
+  subtitulo: historial.length + ' peticiones en esta sesión',
+  resumen: [
+    { k: 'Última petición', v: historial.length ? historial[0].metodo + ' ' + historial[0].ruta : '—' },
+    { k: 'Último estado', v: $('#estado').textContent },
+    { k: 'Tiempo de respuesta', v: $('#tiempo').textContent },
+    { k: 'Tamaño de la respuesta', v: $('#tam').textContent }
+  ],
+  tablas: [{
+    titulo: 'Historial',
+    columnas: ['Método', 'Ruta', 'Estado', 'ms'],
+    filas: historial.map(h => [h.metodo, h.ruta, h.estado, fmt(h.ms, 1)])
+  }],
+  nota: 'El servidor corre íntegramente en el navegador; los datos son sintéticos.'
+}));
+
+</script>

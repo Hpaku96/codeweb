@@ -1,0 +1,25 @@
+# Despliegue del portafolio CODE en Netlify.
+# `npm run build` genera dist/ con la portada, las 30 demos y los assets.
+
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "20"
+  # Playwright solo se usa en la prueba de humo local y en CI: no hace falta
+  # instalarlo —ni descargar Chromium— para construir el sitio.
+  NPM_FLAGS = "--omit=dev"
+  PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = "1"
+
+# Las demos son archivos estáticos con nombre estable: se pueden cachear fuerte.
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=3600"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"

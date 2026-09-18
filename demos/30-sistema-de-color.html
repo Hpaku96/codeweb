@@ -1,0 +1,320 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Generador de sistema de color · CODE</title>
+<meta name="description" content="Escalas construidas en OKLCH para que cada paso se perciba parejo, neutros teñidos con el matiz de la marca, verificación de contraste WCAG y exportación a CSS, Tailwind o JSON.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20100%20100%22%3E%3Ccircle%20cx%3D%2250%22%20cy%3D%2250%22%20r%3D%2241%22%20fill%3D%22none%22%20stroke%3D%22%2523E7B93D%22%20stroke-width%3D%228%22%2F%3E%3Cg%20fill%3D%22none%22%20stroke%3D%22%2523E7B93D%22%20stroke-width%3D%225%22%20stroke-linecap%3D%22round%22%3E%3Cpath%20d%3D%22M30%2026%20L52%2048%22%2F%3E%3Cpath%20d%3D%22M24%2034%20L40%2050%20L40%2058%22%2F%3E%3Cpath%20d%3D%22M20%2044%20L30%2054%20L30%2064%22%2F%3E%3C%2Fg%3E%3Cg%20fill%3D%22%2523E7B93D%22%3E%3Ccircle%20cx%3D%2252%22%20cy%3D%2248%22%20r%3D%225.5%22%2F%3E%3Ccircle%20cx%3D%2240%22%20cy%3D%2258%22%20r%3D%225.5%22%2F%3E%3Ccircle%20cx%3D%2230%22%20cy%3D%2264%22%20r%3D%225.5%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E">
+<script>(function(){try{var t=localStorage.getItem('code-theme');if(t!=='light'&&t!=='dark'){t=matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';}document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="../assets/demo.css">
+
+</head>
+<body>
+<div class="wrap">
+<header class="demo-head">
+  <a class="brand-bar" href="../index.html">
+    <svg viewBox="0 0 100 100" width="20" height="20" aria-hidden="true">
+      <circle cx="50" cy="50" r="41" fill="none" stroke="currentColor" stroke-width="7"/>
+      <g fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round">
+        <path d="M30 26 L52 48"/>
+        <path d="M24 34 L40 50 L40 58"/>
+        <path d="M20 44 L30 54 L30 64"/>
+      </g>
+      <g fill="currentColor">
+        <circle cx="52" cy="48" r="5"/>
+        <circle cx="40" cy="58" r="5"/>
+        <circle cx="30" cy="64" r="5"/>
+      </g>
+    </svg>
+    <span>CODE</span>
+  </a>
+  <span class="idx">30</span>
+  <h1>Generador de sistema de color</h1>
+  <div class="head-actions">
+    <button type="button" class="theme-toggle" id="themeToggle" aria-pressed="false"></button>
+    <a class="back" href="../index.html">← Portafolio</a>
+  </div>
+  <p class="sub">Escalas construidas en OKLCH para que cada paso se perciba parejo, neutros teñidos con el matiz de la marca, verificación de contraste WCAG y exportación a CSS, Tailwind o JSON.</p>
+</header>
+<section class="panel" style="margin-bottom:16px">
+  <div class="row" style="gap:16px">
+    <div class="field" style="min-width:130px"><label for="hex">Color de marca</label><input type="text" id="hex" value="#E7B93D"></div>
+    <div class="field" style="min-width:180px"><label for="matiz">Matiz <span id="matizV"></span></label><input type="range" id="matiz" min="0" max="360" step="1" value="32"></div>
+    <div class="field" style="min-width:180px"><label for="croma">Croma <span id="cromaV"></span></label><input type="range" id="croma" min="0" max="0.32" step="0.005" value="0.16"></div>
+    <div class="field" style="min-width:160px"><label for="tinte">Tinte de los neutros <span id="tinteV"></span></label><input type="range" id="tinte" min="0" max="0.04" step="0.002" value="0.012"></div>
+    <div class="field" style="min-width:140px"><label for="pasos">Pasos de la escala</label>
+      <select id="pasos"><option value="10" selected>10 (50 – 900)</option><option value="7">7</option><option value="5">5</option></select>
+    </div>
+  </div>
+</section>
+
+<div class="cols-2" style="grid-template-columns:minmax(0,1.3fr) minmax(0,1fr)">
+  <div class="stack">
+    <section class="panel">
+      <h2>Escalas</h2>
+      <div id="escalas" class="stack" style="gap:16px"></div>
+    </section>
+
+    <section class="panel">
+      <h2>Contraste sobre fondo claro y oscuro</h2>
+      <div class="tablewrap" style="max-height:330px;overflow:auto">
+        <table><thead><tr><th>Token</th><th>Hex</th><th class="num">vs blanco</th><th class="num">vs negro</th><th>Uso recomendado</th></tr></thead><tbody id="contraste"></tbody></table>
+      </div>
+    </section>
+  </div>
+
+  <div class="stack">
+    <section class="panel">
+      <h2>Vista previa</h2>
+      <div id="previa" class="stack" style="gap:12px"></div>
+    </section>
+    <section class="panel">
+      <h2>Exportar</h2>
+      <div class="seg" id="formato">
+        <button aria-pressed="true" data-f="css">CSS</button>
+        <button aria-pressed="false" data-f="tw">Tailwind</button>
+        <button aria-pressed="false" data-f="json">JSON</button>
+      </div>
+      <div class="console" id="salida" style="margin-top:12px;max-height:420px"></div>
+    </section>
+  </div>
+</div>
+<footer class="demo-foot">
+  <span>CODE · Backend y datos · demo 30 de 30</span>
+  <span>JavaScript · OKLCH · WCAG</span>
+</footer>
+</div>
+<script src="../assets/demo.js"></script>
+<script src="../assets/exportar.js"></script>
+
+<script>
+const { $, $$, el, fmt } = CODE;
+
+/* ---------- conversión de color ---------- */
+const aLineal = c => c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+const aGamma = c => c <= 0.0031308 ? 12.92 * c : 1.055 * Math.pow(c, 1 / 2.4) - 0.055;
+
+function rgbAOklab(r, g, b) {
+  const lr = aLineal(r), lg = aLineal(g), lb = aLineal(b);
+  const l = Math.cbrt(0.4122214708 * lr + 0.5363325363 * lg + 0.0514459929 * lb);
+  const m = Math.cbrt(0.2119034982 * lr + 0.6806995451 * lg + 0.1073969566 * lb);
+  const s = Math.cbrt(0.0883024619 * lr + 0.2817188376 * lg + 0.6299787005 * lb);
+  return [
+    0.2104542553 * l + 0.7936177850 * m - 0.0040720468 * s,
+    1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * s,
+    0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * s
+  ];
+}
+
+function oklabARgb(L, a, b) {
+  const l = Math.pow(L + 0.3963377774 * a + 0.2158037573 * b, 3);
+  const m = Math.pow(L - 0.1055613458 * a - 0.0638541728 * b, 3);
+  const s = Math.pow(L - 0.0894841775 * a - 1.2914855480 * b, 3);
+  return [
+    aGamma(+4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s),
+    aGamma(-1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s),
+    aGamma(-0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s)
+  ];
+}
+
+const enGamut = ([r, g, b]) => [r, g, b].every(v => v >= -0.0005 && v <= 1.0005);
+
+/** OKLCH → hex, bajando el croma hasta que el color entre en sRGB. */
+function oklchAHex(L, C, H) {
+  let c = C;
+  let rgb = oklabARgb(L, c * Math.cos(H * Math.PI / 180), c * Math.sin(H * Math.PI / 180));
+  let intentos = 0;
+  while (!enGamut(rgb) && c > 0 && intentos < 60) {
+    c -= 0.004; intentos++;
+    rgb = oklabARgb(L, c * Math.cos(H * Math.PI / 180), c * Math.sin(H * Math.PI / 180));
+  }
+  return '#' + rgb.map(v => Math.round(Math.min(1, Math.max(0, v)) * 255).toString(16).padStart(2, '0')).join('');
+}
+
+function hexAOklch(hex) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
+  if (!m) return null;
+  const n = parseInt(m[1], 16);
+  const [L, a, b] = rgbAOklab(((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255);
+  let h = Math.atan2(b, a) * 180 / Math.PI;
+  if (h < 0) h += 360;
+  return { L, C: Math.hypot(a, b), H: h };
+}
+
+/* ---------- contraste WCAG ---------- */
+function luminancia(hex) {
+  const n = parseInt(hex.slice(1), 16);
+  const [r, g, b] = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map(v => aLineal(v / 255));
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+function contraste(a, b) {
+  const l1 = luminancia(a), l2 = luminancia(b);
+  return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
+}
+const nivel = r => r >= 7 ? 'AAA' : r >= 4.5 ? 'AA' : r >= 3 ? 'AA grande' : '—';
+
+/* ---------- construcción de la escala ---------- */
+const NIVELES = { 10: [50,100,200,300,400,500,600,700,800,900], 7: [50,100,300,500,700,800,900], 5: [100,300,500,700,900] };
+const LUM = { 50: 0.97, 100: 0.94, 200: 0.88, 300: 0.80, 400: 0.71, 500: 0.62, 600: 0.54, 700: 0.45, 800: 0.36, 900: 0.26 };
+
+function escala(H, cromaMax, pasos) {
+  return NIVELES[pasos].map(n => {
+    const L = LUM[n];
+    // El croma se atenúa en los extremos: un tono muy claro o muy oscuro no admite tanta saturación.
+    const factor = 1 - Math.pow(Math.abs(L - 0.62) / 0.5, 1.6) * 0.55;
+    return { n, hex: oklchAHex(L, cromaMax * Math.max(0.15, factor), H), L };
+  });
+}
+
+let paletas = {};
+
+function construir() {
+  const H = +$('#matiz').value, C = +$('#croma').value, tinte = +$('#tinte').value;
+  const pasos = +$('#pasos').value;
+  $('#matizV').textContent = H + '°';
+  $('#cromaV').textContent = fmt(C, 3);
+  $('#tinteV').textContent = fmt(tinte, 3);
+
+  paletas = {
+    marca: escala(H, C, pasos),
+    neutro: escala(H, tinte, pasos),
+    exito: escala(152, Math.min(0.14, C), pasos),
+    aviso: escala(78, Math.min(0.15, C * 1.05), pasos),
+    peligro: escala(27, Math.min(0.17, C * 1.05), pasos)
+  };
+
+  pintarEscalas();
+  pintarContraste();
+  pintarPrevia();
+  pintarSalida();
+}
+
+function pintarEscalas() {
+  const cont = $('#escalas'); cont.textContent = '';
+  Object.entries(paletas).forEach(([nombre, pasos]) => {
+    cont.appendChild(el('div', null, [
+      el('div.row', { style: 'justify-content:space-between;margin-bottom:6px' }, [
+        el('span', { class: 'lbl', text: nombre }),
+        el('span', { style: 'font:400 11px var(--mono);color:var(--muted)', text: pasos.length + ' pasos' })
+      ]),
+      el('div', { style: 'display:flex;border-radius:var(--r);overflow:hidden;border:1px solid var(--line)' },
+        pasos.map(p => el('div', {
+          title: nombre + '-' + p.n + ' · ' + p.hex,
+          style: `flex:1;height:52px;background:${p.hex};display:flex;align-items:flex-end;justify-content:center;padding-bottom:4px;font:600 9px var(--mono);color:${contraste(p.hex, '#ffffff') > 3 ? '#fff' : '#000'}`
+        }, String(p.n))))
+    ]));
+  });
+}
+
+function pintarContraste() {
+  const tb = $('#contraste'); tb.textContent = '';
+  paletas.marca.forEach(p => {
+    const cb = contraste(p.hex, '#ffffff'), cn = contraste(p.hex, '#111111');
+    const uso = cb >= 4.5 ? 'Texto sobre fondo claro'
+      : cn >= 4.5 ? 'Texto sobre fondo oscuro'
+      : cb >= 3 ? 'Bordes, iconos y texto grande'
+      : 'Solo fondos y superficies';
+    tb.appendChild(el('tr', null, [
+      el('td', null, [el('span', { style: `display:inline-block;width:12px;height:12px;border-radius:2px;background:${p.hex};margin-right:7px;vertical-align:-1px` }), 'marca-' + p.n]),
+      el('td', { text: p.hex }),
+      el('td.num', null, el('span', { class: 'chip ' + (cb >= 4.5 ? 'good' : cb >= 3 ? 'warn' : ''), text: fmt(cb, 2) + ' · ' + nivel(cb) })),
+      el('td.num', null, el('span', { class: 'chip ' + (cn >= 4.5 ? 'good' : cn >= 3 ? 'warn' : ''), text: fmt(cn, 2) + ' · ' + nivel(cn) })),
+      el('td', { text: uso, style: 'white-space:normal;color:var(--muted)' })
+    ]));
+  });
+}
+
+function tono(paleta, n) {
+  const p = paletas[paleta];
+  return (p.find(x => x.n === n) || p[Math.floor(p.length / 2)]).hex;
+}
+
+function pintarPrevia() {
+  const cont = $('#previa'); cont.textContent = '';
+  [
+    { modo: 'Claro', fondo: tono('neutro', 50), sup: '#ffffff', texto: tono('neutro', 900), borde: tono('neutro', 200), acento: tono('marca', 600) },
+    { modo: 'Oscuro', fondo: tono('neutro', 900), sup: tono('neutro', 800), texto: tono('neutro', 50), borde: tono('neutro', 700), acento: tono('marca', 400) }
+  ].forEach(t => {
+    cont.appendChild(el('div', { style: `background:${t.fondo};border:1px solid ${t.borde};border-radius:var(--r);padding:14px` }, [
+      el('div', { style: `background:${t.sup};border:1px solid ${t.borde};border-radius:var(--r);padding:14px` }, [
+        el('div', { text: 'Modo ' + t.modo, style: `font:700 15px var(--cond);color:${t.texto}` }),
+        el('div', { text: 'Una superficie con su texto, un botón y una etiqueta de estado.', style: `font-size:12px;color:${t.texto};opacity:.72;margin-top:4px` }),
+        el('div.row', { style: 'margin-top:12px;gap:8px' }, [
+          el('span', { text: 'Acción principal', style: `background:${t.acento};color:${contraste(t.acento, '#ffffff') > 3.2 ? '#fff' : '#111'};padding:7px 12px;border-radius:var(--r);font:600 12px var(--sans)` }),
+          el('span', { text: 'Correcto', style: `background:${tono('exito', t.modo === 'Claro' ? 100 : 800)};color:${tono('exito', t.modo === 'Claro' ? 800 : 200)};padding:6px 10px;border-radius:2px;font:600 10px var(--mono);text-transform:uppercase;letter-spacing:.07em` }),
+          el('span', { text: 'Atención', style: `background:${tono('aviso', t.modo === 'Claro' ? 100 : 800)};color:${tono('aviso', t.modo === 'Claro' ? 800 : 200)};padding:6px 10px;border-radius:2px;font:600 10px var(--mono);text-transform:uppercase;letter-spacing:.07em` }),
+          el('span', { text: 'Error', style: `background:${tono('peligro', t.modo === 'Claro' ? 100 : 800)};color:${tono('peligro', t.modo === 'Claro' ? 800 : 200)};padding:6px 10px;border-radius:2px;font:600 10px var(--mono);text-transform:uppercase;letter-spacing:.07em` })
+        ])
+      ])
+    ]));
+  });
+}
+
+let formato = 'css';
+function pintarSalida() {
+  let texto = '';
+  if (formato === 'css') {
+    texto = ':root {\n' +
+      Object.entries(paletas).map(([nombre, pasos]) =>
+        pasos.map(p => `  --${nombre}-${p.n}: ${p.hex};`).join('\n')).join('\n\n') +
+      '\n\n  /* roles semánticos */\n' +
+      `  --fondo: var(--neutro-50);\n  --superficie: #ffffff;\n  --texto: var(--neutro-900);\n  --borde: var(--neutro-200);\n  --acento: var(--marca-600);\n}` +
+      '\n\n@media (prefers-color-scheme: dark) {\n  :root:not([data-theme="light"]) {\n' +
+      `    --fondo: var(--neutro-900);\n    --superficie: var(--neutro-800);\n    --texto: var(--neutro-50);\n    --borde: var(--neutro-700);\n    --acento: var(--marca-400);\n  }\n}`;
+  } else if (formato === 'tw') {
+    texto = 'module.exports = {\n  theme: {\n    extend: {\n      colors: {\n' +
+      Object.entries(paletas).map(([nombre, pasos]) =>
+        `        ${nombre}: {\n` + pasos.map(p => `          ${p.n}: '${p.hex}',`).join('\n') + '\n        },').join('\n') +
+      '\n      }\n    }\n  }\n};';
+  } else {
+    texto = JSON.stringify(Object.fromEntries(Object.entries(paletas).map(([n, pasos]) =>
+      [n, Object.fromEntries(pasos.map(p => [p.n, { valor: p.hex, oklch: `oklch(${fmt(p.L * 100, 1)}% ...)` }]))])), null, 2);
+  }
+  $('#salida').textContent = texto;
+}
+
+$('#hex').addEventListener('input', e => {
+  const c = hexAOklch(e.target.value);
+  if (!c) return;
+  $('#matiz').value = Math.round(c.H);
+  $('#croma').value = Math.min(0.32, +c.C.toFixed(3));
+  construir();
+});
+['#matiz', '#croma', '#tinte', '#pasos'].forEach(s => $(s).addEventListener('input', construir));
+$$('#formato button').forEach(b => b.addEventListener('click', () => {
+  $$('#formato button').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+  formato = b.dataset.f;
+  pintarSalida();
+}));
+
+const inicial = hexAOklch($('#hex').value);
+if (inicial) { $('#matiz').value = Math.round(inicial.H); $('#croma').value = Math.min(0.32, +inicial.C.toFixed(3)); }
+construir();
+
+/* ---- exportación de resultados ---- */
+const X = CODE.exportar;
+X.registrar(() => ({
+  titulo: 'Sistema de color',
+  subtitulo: 'Matiz ' + $('#matiz').value + '° · croma ' + $('#croma').value + ' · ' + $('#pasos').selectedOptions[0].textContent,
+  resumen: [
+    { k: 'Color de marca', v: $('#hex').value },
+    { k: 'Escalas generadas', v: Object.keys(paletas).join(', ') },
+    { k: 'Pasos por escala', v: paletas.marca.length }
+  ],
+  tablas: [{
+    titulo: 'Tokens de color',
+    columnas: ['Token', 'Hex', 'Contraste vs blanco', 'Contraste vs negro', 'Nivel WCAG'],
+    filas: Object.entries(paletas).flatMap(([nombre, pasos]) => pasos.map(p => {
+      const cb = contraste(p.hex, '#ffffff'), cn = contraste(p.hex, '#111111');
+      return [nombre + '-' + p.n, p.hex, fmt(cb, 2), fmt(cn, 2), nivel(Math.max(cb, cn))];
+    }))
+  }],
+  nota: 'Las escalas se construyen en OKLCH y se recortan al gamut sRGB bajando el croma.'
+}));
+</script>
+</body>
+</html>

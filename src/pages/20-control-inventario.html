@@ -1,0 +1,156 @@
+<!--meta
+{
+  "id": "20",
+  "title": "Control de inventario y reposición",
+  "tagline": "Punto de reorden con stock de seguridad por nivel de servicio, lote económico de compra, días de cobertura y la orden de compra sugerida para los productos en rojo.",
+  "area": "negocio",
+  "stack": ["JavaScript", "Gestión de stock", "SVG"],
+  "libs": ["../assets/datos-comercial.js"],
+  "highlights": [
+    "Stock de seguridad por nivel de servicio (z) y variabilidad del plazo de entrega",
+    "Lote económico de compra sobre costo de pedido y costo de mantener inventario",
+    "Semáforo de cobertura que ordena la tabla por urgencia real, no por nombre"
+  ]
+}
+-->
+
+<section class="panel" style="margin-bottom:16px">
+  <div class="row">
+    <div class="field" style="min-width:140px"><label for="lt">Plazo de entrega (días)</label><input type="number" id="lt" value="7" min="1" step="1"></div>
+    <div class="field" style="min-width:170px"><label for="servicio">Nivel de servicio</label>
+      <select id="servicio"><option value="1.28">90 %</option><option value="1.65" selected>95 %</option><option value="1.96">97.5 %</option><option value="2.33">99 %</option></select>
+    </div>
+    <div class="field" style="min-width:150px"><label for="pedido">Costo de emitir un pedido (S/)</label><input type="number" id="pedido" value="120" min="0" step="10"></div>
+    <div class="field" style="min-width:160px"><label for="mant">Costo anual de mantener (%)</label><input type="number" id="mant" value="22" min="1" step="1"></div>
+    <div class="field" style="min-width:150px"><label for="varia">Variabilidad de la demanda (%)</label><input type="number" id="varia" value="25" min="0" step="5"></div>
+  </div>
+</section>
+
+<div class="cols" style="margin-bottom:16px">
+  <div class="readout hi"><span class="k">Valorizado del inventario</span><span class="v" id="kVal">—</span></div>
+  <div class="readout"><span class="k">Productos bajo el punto de reorden</span><span class="v" id="kRop">—</span></div>
+  <div class="readout"><span class="k">Cobertura promedio</span><span class="v" id="kCob">—</span><span class="u">días</span></div>
+  <div class="readout"><span class="k">Compra sugerida</span><span class="v" id="kCompra">—</span></div>
+</div>
+
+<div class="cols-2" style="grid-template-columns:minmax(0,1.7fr) minmax(0,1fr)">
+  <section class="panel">
+    <h2>Situación por producto</h2>
+    <div class="tablewrap" style="max-height:560px;overflow-y:auto">
+      <table>
+        <thead><tr><th>Producto</th><th class="num">Stock</th><th class="num">Dem./día</th><th class="num">Cobertura</th><th class="num">ROP</th><th class="num">EOQ</th><th>Estado</th></tr></thead>
+        <tbody id="tabla"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="stack">
+    <section class="panel"><h2>Valorizado por línea</h2><div id="gLinea"></div></section>
+    <section class="panel">
+      <h2>Orden de compra sugerida</h2>
+      <div class="tablewrap" style="max-height:300px;overflow-y:auto"><table><thead><tr><th>Producto</th><th class="num">Pedir</th><th class="num">Costo</th></tr></thead><tbody id="orden"></tbody></table></div>
+      <div class="readout" style="margin-top:12px"><span class="k">Total de la orden</span><span class="v" id="totOrden">—</span></div>
+    </section>
+  </div>
+</div>
+
+<script>
+const { $, el, num, fmt, soles, token, barChart, draw, onThemeChange } = CODE;
+const { PRODUCTOS } = DATOS;
+
+function analizar() {
+  const lt = num($('#lt').value, 7);
+  const z = num($('#servicio').value, 1.65);
+  const S = num($('#pedido').value, 120);
+  const h = num($('#mant').value, 22) / 100;
+  const cv = num($('#varia').value, 25) / 100;
+
+  return PRODUCTOS.map(p => {
+    const d = p.rotacion / 30;                    // demanda diaria
+    const ss = z * (cv * d) * Math.sqrt(lt);      // stock de seguridad
+    const rop = d * lt + ss;
+    const D = p.rotacion * 12;                    // demanda anual
+    const H = p.costo * h;
+    const eoq = Math.sqrt(2 * D * S / (H || 1));
+    const cobertura = d > 0 ? p.stock / d : Infinity;
+    const estado = p.stock < rop * 0.6 ? 'critico' : p.stock < rop ? 'bajo' : cobertura > 60 ? 'exceso' : 'normal';
+    const pedir = p.stock < rop ? Math.max(eoq, rop + eoq - p.stock) : 0;
+    return { p, d, ss, rop, eoq, cobertura, estado, pedir, valor: p.stock * p.costo };
+  });
+}
+
+const ORDEN_ESTADO = { critico: 0, bajo: 1, exceso: 2, normal: 3 };
+const ETIQUETA = { critico: ['bad', 'Crítico'], bajo: ['warn', 'Bajo el ROP'], exceso: ['chip', 'Sobrestock'], normal: ['good', 'Normal'] };
+
+function render() {
+  const filas = analizar().sort((a, b) =>
+    ORDEN_ESTADO[a.estado] - ORDEN_ESTADO[b.estado] || a.cobertura - b.cobertura);
+
+  const tb = $('#tabla'); tb.textContent = '';
+  filas.forEach(f => {
+    const [clase, texto] = ETIQUETA[f.estado];
+    tb.appendChild(el('tr', null, [
+      el('td', { style: 'white-space:normal;min-width:170px' }, [
+        el('div', { text: f.p.nombre }),
+        el('div', { class: 'chip', text: f.p.marca + ' · ' + f.p.sku, style: 'margin-top:4px' })
+      ]),
+      el('td.num', { text: fmt(f.p.stock, 0) }),
+      el('td.num', { text: fmt(f.d, 1) }),
+      el('td.num', { text: Number.isFinite(f.cobertura) ? fmt(f.cobertura, 0) + ' d' : '—' }),
+      el('td.num', { text: fmt(f.rop, 0) }),
+      el('td.num', { text: fmt(f.eoq, 0) }),
+      el('td', null, el('span', { class: 'chip ' + (clase === 'chip' ? '' : clase), text: texto }))
+    ]));
+  });
+
+  const valor = filas.reduce((s, f) => s + f.valor, 0);
+  const bajos = filas.filter(f => f.pedir > 0);
+  const totalOrden = bajos.reduce((s, f) => s + f.pedir * f.p.costo, 0);
+  $('#kVal').textContent = soles(valor, 0);
+  $('#kRop').textContent = bajos.length;
+  $('#kCob').textContent = fmt(filas.reduce((s, f) => s + Math.min(f.cobertura, 200), 0) / filas.length, 0);
+  $('#kCompra').textContent = soles(totalOrden, 0);
+
+  const ob = $('#orden'); ob.textContent = '';
+  if (!bajos.length) ob.appendChild(el('tr', null, el('td', { colspan: 3, text: 'Ningún producto bajo el punto de reorden.', style: 'color:var(--muted)' })));
+  bajos.sort((a, b) => b.pedir * b.p.costo - a.pedir * a.p.costo).forEach(f => ob.appendChild(el('tr', null, [
+    el('td', { text: f.p.nombre, style: 'white-space:normal;min-width:140px' }),
+    el('td.num', { text: fmt(f.pedir, 0) + ' ' + f.p.unidad }),
+    el('td.num', { text: fmt(f.pedir * f.p.costo, 0) })
+  ])));
+  $('#totOrden').textContent = soles(totalOrden, 0);
+
+  const lineas = Array.from(new Set(PRODUCTOS.map(p => p.linea)));
+  draw($('#gLinea'), barChart({
+    data: lineas.map((l, i) => ({
+      label: l,
+      value: filas.filter(f => f.p.linea === l).reduce((s, f) => s + f.valor, 0),
+      color: [token('accent'), token('blue'), token('muted')][i % 3]
+    })),
+    w: 560, h: 240, showValues: true, yFmt: v => fmt(v / 1000, 0) + 'k'
+  }));
+}
+
+['#lt', '#servicio', '#pedido', '#mant', '#varia'].forEach(s => $(s).addEventListener('input', render));
+onThemeChange(render);
+render();
+
+/* ---- exportación de resultados ---- */
+const X = CODE.exportar;
+X.registrar(() => ({
+  titulo: 'Control de inventario y reposición',
+  subtitulo: 'Plazo de entrega ' + $('#lt').value + ' días · nivel de servicio ' +
+    $('#servicio').selectedOptions[0].textContent,
+  resumen: X.desdeReadouts(),
+  tablas: [{
+    titulo: 'Situación por producto',
+    columnas: ['SKU', 'Producto', 'Stock', 'Demanda diaria', 'Cobertura (d)', 'Punto de reorden', 'Lote económico', 'Pedir', 'Estado'],
+    filas: analizar().sort((a, b) => ORDEN_ESTADO[a.estado] - ORDEN_ESTADO[b.estado] || a.cobertura - b.cobertura)
+      .map(f => [f.p.sku, f.p.nombre, fmt(f.p.stock, 0), fmt(f.d, 2),
+        Number.isFinite(f.cobertura) ? fmt(f.cobertura, 0) : '', fmt(f.rop, 1), fmt(f.eoq, 1),
+        f.pedir ? fmt(f.pedir, 0) : '', ETIQUETA[f.estado][1]])
+  }],
+  nota: 'El stock de seguridad usa el factor z del nivel de servicio y la variabilidad declarada de la demanda.'
+}));
+
+</script>

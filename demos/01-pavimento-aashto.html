@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Diseño de pavimento flexible AASHTO 93 · CODE</title>
+<meta name="description" content="Resuelve el número estructural requerido por la ecuación AASHTO 93 y verifica si el paquete de capas propuesto lo cubre.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20100%20100%22%3E%3Ccircle%20cx%3D%2250%22%20cy%3D%2250%22%20r%3D%2241%22%20fill%3D%22none%22%20stroke%3D%22%2523E7B93D%22%20stroke-width%3D%228%22%2F%3E%3Cg%20fill%3D%22none%22%20stroke%3D%22%2523E7B93D%22%20stroke-width%3D%225%22%20stroke-linecap%3D%22round%22%3E%3Cpath%20d%3D%22M30%2026%20L52%2048%22%2F%3E%3Cpath%20d%3D%22M24%2034%20L40%2050%20L40%2058%22%2F%3E%3Cpath%20d%3D%22M20%2044%20L30%2054%20L30%2064%22%2F%3E%3C%2Fg%3E%3Cg%20fill%3D%22%2523E7B93D%22%3E%3Ccircle%20cx%3D%2252%22%20cy%3D%2248%22%20r%3D%225.5%22%2F%3E%3Ccircle%20cx%3D%2240%22%20cy%3D%2258%22%20r%3D%225.5%22%2F%3E%3Ccircle%20cx%3D%2230%22%20cy%3D%2264%22%20r%3D%225.5%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E">
+<script>(function(){try{var t=localStorage.getItem('code-theme');if(t!=='light'&&t!=='dark'){t=matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';}document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="../assets/demo.css">
+
+</head>
+<body>
+<div class="wrap">
+<header class="demo-head">
+  <a class="brand-bar" href="../index.html">
+    <svg viewBox="0 0 100 100" width="20" height="20" aria-hidden="true">
+      <circle cx="50" cy="50" r="41" fill="none" stroke="currentColor" stroke-width="7"/>
+      <g fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round">
+        <path d="M30 26 L52 48"/>
+        <path d="M24 34 L40 50 L40 58"/>
+        <path d="M20 44 L30 54 L30 64"/>
+      </g>
+      <g fill="currentColor">
+        <circle cx="52" cy="48" r="5"/>
+        <circle cx="40" cy="58" r="5"/>
+        <circle cx="30" cy="64" r="5"/>
+      </g>
+    </svg>
+    <span>CODE</span>
+  </a>
+  <span class="idx">01</span>
+  <h1>Diseño de pavimento flexible AASHTO 93</h1>
+  <div class="head-actions">
+    <button type="button" class="theme-toggle" id="themeToggle" aria-pressed="false"></button>
+    <a class="back" href="../index.html">← Portafolio</a>
+  </div>
+  <p class="sub">Resuelve el número estructural requerido por la ecuación AASHTO 93 y verifica si el paquete de capas propuesto lo cubre.</p>
+</header>
+<div class="cols-2">
+  <div class="stack">
+    <section class="panel">
+      <h2>Datos de tránsito y confiabilidad</h2>
+      <fieldset>
+        <div class="field">
+          <label for="w18">W₁₈ — ejes equivalentes de 8.2 t en el periodo</label>
+          <input type="number" id="w18" value="5200000" min="10000" step="10000">
+        </div>
+        <div class="field">
+          <label for="rel">Confiabilidad R</label>
+          <select id="rel">
+            <option value="0">50 % — vía local</option>
+            <option value="-0.841">80 % — colectora</option>
+            <option value="-1.037">85 % — arterial urbana</option>
+            <option value="-1.282" selected>90 % — arterial principal</option>
+            <option value="-1.645">95 % — autopista</option>
+            <option value="-2.327">99 % — interestatal</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="so">Desviación estándar combinada S₀</label>
+          <input type="number" id="so" value="0.45" step="0.01" min="0.3" max="0.5">
+          <span class="hint">0.40–0.50 para pavimento flexible.</span>
+        </div>
+        <div class="field">
+          <label for="psi">Pérdida de serviciabilidad ΔPSI</label>
+          <input type="number" id="psi" value="1.9" step="0.1" min="0.5" max="3">
+          <span class="hint">p₀ inicial 4.2 · p_t final 2.3 → ΔPSI 1.9</span>
+        </div>
+        <div class="field">
+          <label for="mr">Módulo resiliente de la subrasante Mr (psi)</label>
+          <input type="number" id="mr" value="11000" step="500" min="1500">
+          <span class="hint">CBR 8 % ≈ 11 000 psi (Mr ≈ 1500 × CBR)</span>
+        </div>
+      </fieldset>
+    </section>
+
+    <section class="panel">
+      <h2>Paquete estructural propuesto</h2>
+      <div class="tablewrap">
+        <table id="capas">
+          <thead>
+            <tr><th>Capa</th><th class="num">a</th><th class="num">m</th><th class="num">e (cm)</th><th class="num">SN</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <p class="note" style="margin-top:12px"><strong>a</strong> coeficiente estructural por pulgada · <strong>m</strong> coeficiente de drenaje · el espesor se convierte a pulgadas antes de aportar al SN.</p>
+    </section>
+  </div>
+
+  <div class="stack">
+    <section class="panel">
+      <h2>Resultado</h2>
+      <div class="cols" style="gap:10px">
+        <div class="readout hi"><span class="k">SN requerido</span><span class="v" id="snReq">—</span></div>
+        <div class="readout"><span class="k">SN provisto</span><span class="v" id="snProv">—</span></div>
+      </div>
+      <div class="row" style="margin-top:14px">
+        <span id="veredicto" class="chip">—</span>
+        <span class="chip" id="espesorTotal">—</span>
+      </div>
+      <dl class="kv" style="margin-top:16px">
+        <dt>Z_R (confiabilidad)</dt><dd id="zr">—</dd>
+        <dt>log₁₀(W₁₈) de diseño</dt><dd id="logw">—</dd>
+        <dt>Holgura SN provisto − requerido</dt><dd id="holgura">—</dd>
+        <dt>Iteraciones de bisección</dt><dd id="iters">—</dd>
+      </dl>
+    </section>
+
+    <section class="panel">
+      <h2>SN requerido vs. tránsito acumulado</h2>
+      <div id="graf"></div>
+      <p class="note" style="margin-top:10px">Con el resto de parámetros fijos. El punto marca el diseño actual.</p>
+    </section>
+  </div>
+</div>
+<footer class="demo-foot">
+  <span>CODE · Ingeniería · demo 01 de 30</span>
+  <span>JavaScript · SVG · Método numérico</span>
+</footer>
+</div>
+<script src="../assets/demo.js"></script>
+<script src="../assets/exportar.js"></script>
+
+<script>
+const { $, el, num, fmt, token, lineChart, draw, onThemeChange } = CODE;
+
+const capas = [
+  { nombre: 'Carpeta asfáltica en caliente', a: 0.44, m: 1.00, e: 10, fijo: true },
+  { nombre: 'Base granular', a: 0.14, m: 1.00, e: 25 },
+  { nombre: 'Subbase granular', a: 0.11, m: 0.90, e: 25 }
+];
+
+/* Ecuación AASHTO 93: devuelve log10(W18) para un SN dado. */
+function logW18(sn, zr, so, dpsi, mr) {
+  return zr * so + 9.36 * Math.log10(sn + 1) - 0.20
+    + Math.log10(dpsi / (4.2 - 1.5)) / (0.40 + 1094 / Math.pow(sn + 1, 5.19))
+    + 2.32 * Math.log10(mr) - 8.07;
+}
+
+/* No hay despeje cerrado para SN: se resuelve por bisección sobre un intervalo monótono. */
+function resolverSN(w18, zr, so, dpsi, mr) {
+  const objetivo = Math.log10(w18);
+  let lo = 0.5, hi = 12, it = 0;
+  while (hi - lo > 1e-4 && it < 60) {
+    const mid = (lo + hi) / 2;
+    (logW18(mid, zr, so, dpsi, mr) < objetivo ? lo = mid : hi = mid);
+    it++;
+  }
+  return { sn: (lo + hi) / 2, it };
+}
+
+function pintarCapas() {
+  const tb = $('#capas tbody');
+  tb.textContent = '';
+  capas.forEach((c, i) => {
+    const inA = el('input', { type: 'number', value: c.a, step: '0.01', min: '0.05', max: '0.5', 'aria-label': 'coeficiente a ' + c.nombre });
+    const inM = el('input', { type: 'number', value: c.m, step: '0.05', min: '0.4', max: '1.4', 'aria-label': 'coeficiente m ' + c.nombre });
+    const inE = el('input', { type: 'number', value: c.e, step: '1', min: '0', 'aria-label': 'espesor ' + c.nombre });
+    [[inA, 'a'], [inM, 'm'], [inE, 'e']].forEach(([inp, k]) => {
+      if (k === 'm' && c.fijo) { inp.value = 1; inp.disabled = true; }
+      inp.addEventListener('input', () => { capas[i][k] = num(inp.value, capas[i][k]); calcular(); });
+    });
+    const snCell = el('td.num', { id: 'sn' + i });
+    tb.appendChild(el('tr', null, [
+      el('td', { text: c.nombre, style: 'white-space:normal;min-width:150px' }),
+      el('td.num', null, inA), el('td.num', null, inM), el('td.num', null, inE), snCell
+    ]));
+  });
+}
+
+function calcular() {
+  const w18 = num($('#w18').value, 1e6);
+  const zr = num($('#rel').value, -1.282);
+  const so = num($('#so').value, 0.45);
+  const dpsi = num($('#psi').value, 1.9);
+  const mr = num($('#mr').value, 11000);
+
+  const { sn, it } = resolverSN(w18, zr, so, dpsi, mr);
+  let snProv = 0, espesor = 0;
+  capas.forEach((c, i) => {
+    const aporte = c.a * (c.fijo ? 1 : c.m) * (c.e / 2.54);
+    snProv += aporte; espesor += c.e;
+    $('#sn' + i).textContent = fmt(aporte, 2);
+  });
+
+  $('#snReq').textContent = fmt(sn, 2);
+  $('#snProv').textContent = fmt(snProv, 2);
+  $('#zr').textContent = fmt(zr, 3);
+  $('#logw').textContent = fmt(Math.log10(w18), 3);
+  $('#iters').textContent = it;
+  $('#holgura').textContent = (snProv - sn >= 0 ? '+' : '') + fmt(snProv - sn, 2);
+  $('#espesorTotal').textContent = 'Espesor total ' + fmt(espesor, 0) + ' cm';
+
+  const v = $('#veredicto');
+  const dif = snProv - sn;
+  v.className = 'chip ' + (dif >= 0.15 ? 'good' : dif >= 0 ? 'warn' : 'bad');
+  v.textContent = dif >= 0.15 ? 'Cumple con holgura' : dif >= 0 ? 'Cumple al límite' : 'No cumple — aumentar espesores';
+
+  const pts = [];
+  for (let l = 4.5; l <= 8.2; l += 0.05) pts.push([l, resolverSN(Math.pow(10, l), zr, so, dpsi, mr).sn]);
+  draw($('#graf'), lineChart({
+    series: [
+      { points: pts, color: token('blue'), width: 2 },
+      { points: [[Math.log10(w18), sn]], color: token('accent'), dots: 5 }
+    ],
+    w: 620, h: 290, xMin: 4.5, xMax: 8.2,
+    xLabel: 'log₁₀ W₁₈', yLabel: 'SN requerido',
+    xFmt: v => fmt(v, 1), yFmt: v => fmt(v, 1)
+  }));
+}
+
+CODE.exportar.registrar(() => ({
+  titulo: 'Diseño de pavimento flexible AASHTO 93',
+  subtitulo: 'Número estructural requerido y verificación del paquete de capas',
+  resumen: CODE.exportar.desdeReadouts().concat(CODE.exportar.desdeKv('.kv'), [
+    { k: 'Veredicto', v: $('#veredicto').textContent },
+    { k: 'Espesor total', v: $('#espesorTotal').textContent }
+  ]),
+  tablas: [Object.assign(CODE.exportar.desdeTabla('#capas'), { titulo: 'Paquete estructural propuesto' })],
+  nota: 'La ecuación AASHTO 93 se resuelve por bisección; el SN provisto suma el aporte de cada capa convertida a pulgadas.'
+}));
+
+pintarCapas();
+['#w18', '#rel', '#so', '#psi', '#mr'].forEach(s => $(s).addEventListener('input', calcular));
+onThemeChange(calcular);
+calcular();
+</script>
+</body>
+</html>

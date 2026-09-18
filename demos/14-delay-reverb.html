@@ -1,0 +1,370 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>SPACE-2 · delay y reverb · CODE</title>
+<meta name="description" content="Procesador de espacio con delay ping-pong sincronizado al tempo, filtro dentro del lazo de realimentación y reverb de convolución sobre una respuesta al impulso generada al vuelo. Graba y exporta el resultado.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20100%20100%22%3E%3Ccircle%20cx%3D%2250%22%20cy%3D%2250%22%20r%3D%2241%22%20fill%3D%22none%22%20stroke%3D%22%2523E7B93D%22%20stroke-width%3D%228%22%2F%3E%3Cg%20fill%3D%22none%22%20stroke%3D%22%2523E7B93D%22%20stroke-width%3D%225%22%20stroke-linecap%3D%22round%22%3E%3Cpath%20d%3D%22M30%2026%20L52%2048%22%2F%3E%3Cpath%20d%3D%22M24%2034%20L40%2050%20L40%2058%22%2F%3E%3Cpath%20d%3D%22M20%2044%20L30%2054%20L30%2064%22%2F%3E%3C%2Fg%3E%3Cg%20fill%3D%22%2523E7B93D%22%3E%3Ccircle%20cx%3D%2252%22%20cy%3D%2248%22%20r%3D%225.5%22%2F%3E%3Ccircle%20cx%3D%2240%22%20cy%3D%2258%22%20r%3D%225.5%22%2F%3E%3Ccircle%20cx%3D%2230%22%20cy%3D%2264%22%20r%3D%225.5%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E">
+<script>(function(){try{var t=localStorage.getItem('code-theme');if(t!=='light'&&t!=='dark'){t=matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';}document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="../assets/demo.css">
+<link rel="stylesheet" href="../assets/maquina.css">
+</head>
+<body>
+<div class="wrap">
+<header class="demo-head">
+  <a class="brand-bar" href="../index.html">
+    <svg viewBox="0 0 100 100" width="20" height="20" aria-hidden="true">
+      <circle cx="50" cy="50" r="41" fill="none" stroke="currentColor" stroke-width="7"/>
+      <g fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round">
+        <path d="M30 26 L52 48"/>
+        <path d="M24 34 L40 50 L40 58"/>
+        <path d="M20 44 L30 54 L30 64"/>
+      </g>
+      <g fill="currentColor">
+        <circle cx="52" cy="48" r="5"/>
+        <circle cx="40" cy="58" r="5"/>
+        <circle cx="30" cy="64" r="5"/>
+      </g>
+    </svg>
+    <span>CODE</span>
+  </a>
+  <span class="idx">14</span>
+  <h1>SPACE-2 · delay y reverb</h1>
+  <div class="head-actions">
+    <button type="button" class="theme-toggle" id="themeToggle" aria-pressed="false"></button>
+    <a class="back" href="../index.html">← Portafolio</a>
+  </div>
+  <p class="sub">Procesador de espacio con delay ping-pong sincronizado al tempo, filtro dentro del lazo de realimentación y reverb de convolución sobre una respuesta al impulso generada al vuelo. Graba y exporta el resultado.</p>
+</header>
+<div id="maquina"></div>
+
+<section class="panel">
+  <h2>Cómo se usa</h2>
+  <div class="cols">
+    <p class="note"><strong>Pulso seco</strong> es la mejor fuente para oír las repeticiones por separado y entender qué hace cada control.</p>
+    <p class="note"><strong>Figura</strong> ata el delay al tempo: la corchea con puntillo es la que da ese vaivén de las mezclas modernas.</p>
+    <p class="note"><strong>Filtro del lazo</strong> oscurece cada repetición, como hacían las cintas: sin él, el eco suena metálico.</p>
+    <p class="note"><strong>Tamaño y decaimiento</strong> regeneran la respuesta al impulso; el cambio se nota en la cola dibujada abajo.</p>
+  </div>
+</section>
+<footer class="demo-foot">
+  <span>CODE · Audio y música · demo 14 de 30</span>
+  <span>Web Audio API · Convolución · Canvas · WAV / MP3</span>
+</footer>
+</div>
+<script src="../assets/demo.js"></script>
+<script src="../assets/exportar.js"></script>
+<script src="../assets/audio.js"></script>
+<script src="../assets/grabar.js"></script>
+<script src="../assets/maquina.js"></script>
+<script>
+const { $, el, fmt } = CODE;
+const A = AUDIO, M = MAQUINA, G = GRABAR;
+
+const P = {
+  delayMix: 0.3, feedback: 0.42, tono: 3200, libre: 320, figura: 0.5,
+  tamano: 2.2, decaimiento: 3.0, brillo: 0.32, preDelay: 20, reverbMix: 0.3, seco: 0.85
+};
+const FIGURAS = [
+  [0.25, 'Semicorchea'], [0.333, 'Tresillo'], [0.5, 'Corchea'],
+  [0.75, 'Corchea con puntillo'], [1, 'Negra'], [0, 'Libre']
+];
+
+let fuente = 'loop', sonando = false, bufferUsuario = null, pingpong = true, bpm = 100;
+let src = null, nodos = null, irBuffer = null, grabadora = null;
+let pantalla, lienzoTaps, lienzoIr, btnPlay, btnPing, botonesFuente = {};
+
+function pulso(c) {
+  const dur = 2, n = Math.floor(c.sampleRate * dur), b = c.createBuffer(2, n, c.sampleRate);
+  for (let ch = 0; ch < 2; ch++) {
+    const d = b.getChannelData(ch);
+    [0, 1].forEach(gp => {
+      const ini = Math.floor(gp * c.sampleRate);
+      for (let i = 0; i < c.sampleRate * 0.12 && ini + i < n; i++) {
+        const t = i / c.sampleRate;
+        d[ini + i] = (Math.sin(2 * Math.PI * 320 * t) + (Math.random() * 2 - 1) * 0.4) * Math.exp(-28 * t) * 0.6;
+      }
+    });
+  }
+  return b;
+}
+
+const tiempoDelay = () => P.figura === 0 ? P.libre / 1000 : (60 / bpm) * P.figura;
+
+function construirCadena(c) {
+  const entrada = c.createGain();
+  const seco = c.createGain();
+  const salida = c.createGain();
+
+  /* Delay ping-pong: dos líneas cruzadas, con filtro dentro del lazo. */
+  const merge = c.createChannelMerger(2);
+  const dL = c.createDelay(4), dR = c.createDelay(4);
+  const fb = c.createGain();
+  const filtroFb = c.createBiquadFilter();
+  filtroFb.type = 'lowpass';
+  const envioD = c.createGain();
+
+  entrada.connect(envioD);
+  envioD.connect(dL);
+  dL.connect(filtroFb);
+  filtroFb.connect(dR);
+  dR.connect(fb);
+  fb.connect(dL);
+  dL.connect(merge, 0, 0);
+  dR.connect(merge, 0, 1);
+  const mezclaD = c.createGain();
+  merge.connect(mezclaD);
+  mezclaD.connect(salida);
+
+  /* Reverb por convolución con predelay. */
+  const pre = c.createDelay(0.5);
+  const conv = c.createConvolver();
+  const mezclaR = c.createGain();
+  entrada.connect(pre); pre.connect(conv); conv.connect(mezclaR); mezclaR.connect(salida);
+
+  entrada.connect(seco); seco.connect(salida);
+  const maestro = c.createGain();
+  salida.connect(maestro);
+  maestro.connect(c.destination);
+  grabadora = G.grabadora(c, maestro);
+
+  nodos = { entrada, seco, salida, dL, dR, fb, filtroFb, envioD, mezclaD, pre, conv, mezclaR, maestro };
+  regenerarIR();
+  aplicar();
+}
+
+function regenerarIR() {
+  /* Antes del primer gesto del usuario no existe AudioContext: para la vista
+     basta un contexto offline, y al construir la cadena se regenera con el real. */
+  const c = A.ready() ? A.ctx()
+    : new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(2, 1024, 44100);
+  irBuffer = A.impulso(c, Math.max(0.2, P.tamano), P.decaimiento, P.brillo);
+  if (nodos) nodos.conv.buffer = irBuffer;
+  dibujarIR();
+}
+
+function aplicar() {
+  if (!nodos) { dibujarTaps(); pintarLcd(); return; }
+  const c = A.ctx(), t = c.currentTime, td = tiempoDelay();
+  nodos.dL.delayTime.setTargetAtTime(pingpong ? td / 2 : td, t, 0.05);
+  nodos.dR.delayTime.setTargetAtTime(pingpong ? td / 2 : td, t, 0.05);
+  nodos.fb.gain.setTargetAtTime(P.feedback, t, 0.05);
+  nodos.filtroFb.frequency.setTargetAtTime(P.tono, t, 0.05);
+  nodos.mezclaD.gain.setTargetAtTime(P.delayMix, t, 0.05);
+  nodos.mezclaR.gain.setTargetAtTime(P.reverbMix, t, 0.05);
+  nodos.seco.gain.setTargetAtTime(P.seco, t, 0.05);
+  nodos.pre.delayTime.setTargetAtTime(P.preDelay / 1000, t, 0.05);
+  dibujarTaps();
+  pintarLcd();
+}
+
+async function prepararAudio() {
+  const c = await A.resume();
+  if (!nodos) construirCadena(c);
+  return c;
+}
+
+async function reproducir() {
+  const c = await prepararAudio();
+  if (src) { try { src.stop(); } catch (e) {} }
+  src = c.createBufferSource();
+  src.buffer = fuente === 'archivo' && bufferUsuario ? bufferUsuario
+    : fuente === 'pulso' ? pulso(c) : A.loopArmonico(c, 4);
+  src.loop = true;
+  src.connect(nodos.entrada);
+  src.start();
+  sonando = true;
+  btnPlay.encender(true);
+  pintarLcd();
+}
+
+function detener() {
+  if (src) { try { src.stop(); } catch (e) {} src = null; }
+  sonando = false;
+  btnPlay.encender(false);
+  pintarLcd();
+}
+
+/* ================= interfaz ================= */
+
+function construir() {
+  const { maquina, panel } = M.chasis({
+    marca: 'CODE',
+    modelo: 'SPACE-2 · delay & reverb',
+    derecha: [M.led('Signal', 'verde')],
+    pie: [el('span', { text: 'Reverb por convolución sobre impulso generado en el momento' })]
+  });
+
+  pantalla = M.lcd(88);
+  const transporte = el('div.fila-botones', null, [
+    (btnPlay = M.boton({ texto: '▶ Play', onClick: () => sonando ? detener() : reproducir() })),
+    M.boton({ texto: '■ Stop', onClick: detener }),
+    M.botonArchivo({
+      texto: 'Abrir', pie: 'tu audio', id: 'archSpace',
+      onArchivo: async f => {
+        if (!f[0]) return;
+        const c = await prepararAudio();
+        bufferUsuario = await c.decodeAudioData(await f[0].arrayBuffer());
+        fuente = 'archivo'; marcarFuente(); reproducir();
+      }
+    })
+  ]);
+  const fuentes = el('div.fila-botones', { style: 'margin-top:10px' });
+  [['loop', 'Loop'], ['pulso', 'Pulso seco']].forEach(([clave, texto]) => {
+    const b = M.boton({ texto, onClick: () => { fuente = clave; marcarFuente(); if (sonando) reproducir(); } });
+    botonesFuente[clave] = b;
+    fuentes.appendChild(b);
+  });
+
+  const reloj = el('div.fila-perillas', { style: 'margin-top:10px' }, [
+    M.perilla({ nombre: 'Tempo', min: 60, max: 180, valor: bpm, paso: 1,
+      formato: v => fmt(v, 0) + ' BPM', onCambio: v => { bpm = v; aplicar(); } }),
+    M.perilla({ nombre: 'Figura', min: 0, max: 5, valor: 2, paso: 1,
+      formato: v => FIGURAS[Math.round(v)][1],
+      onCambio: v => { P.figura = FIGURAS[Math.round(v)][0]; aplicar(); } })
+  ]);
+
+  const delay = el('div.fila-perillas', null, [
+    M.perilla({ nombre: 'Tiempo libre', min: 20, max: 1200, valor: P.libre, log: true,
+      formato: v => fmt(v, 0) + ' ms', onCambio: v => { P.libre = v; aplicar(); } }),
+    M.perilla({ nombre: 'Feedback', min: 0, max: 0.92, valor: P.feedback,
+      formato: v => fmt(v * 100, 0) + ' %', onCambio: v => { P.feedback = v; aplicar(); } }),
+    M.perilla({ nombre: 'Filtro', min: 400, max: 12000, valor: P.tono, log: true,
+      formato: v => v >= 1000 ? fmt(v / 1000, 1) + ' kHz' : fmt(v, 0) + ' Hz',
+      onCambio: v => { P.tono = v; aplicar(); } }),
+    M.perilla({ nombre: 'Mezcla', min: 0, max: 1, valor: P.delayMix,
+      formato: v => fmt(v * 100, 0) + ' %', onCambio: v => { P.delayMix = v; aplicar(); } })
+  ]);
+  const botonPing = el('div.fila-botones', { style: 'margin-top:10px' }, [
+    (btnPing = M.boton({ texto: 'Ping-pong', alternar: true, activo: true, onClick: v => { pingpong = v; aplicar(); } }))
+  ]);
+
+  const reverb = el('div.fila-perillas', null, [
+    M.perilla({ nombre: 'Tamaño', min: 0.3, max: 6, valor: P.tamano,
+      formato: v => fmt(v, 1) + ' s', onCambio: v => { P.tamano = v; regenerarIR(); aplicar(); } }),
+    M.perilla({ nombre: 'Decaimiento', min: 0.5, max: 8, valor: P.decaimiento,
+      formato: v => fmt(v, 1), onCambio: v => { P.decaimiento = v; regenerarIR(); aplicar(); } }),
+    M.perilla({ nombre: 'Brillo', min: 0.05, max: 1, valor: P.brillo,
+      formato: v => fmt(v * 100, 0) + ' %', onCambio: v => { P.brillo = v; regenerarIR(); aplicar(); } }),
+    M.perilla({ nombre: 'Predelay', min: 0, max: 150, valor: P.preDelay, paso: 1,
+      formato: v => fmt(v, 0) + ' ms', onCambio: v => { P.preDelay = v; aplicar(); } }),
+    M.perilla({ nombre: 'Mezcla', min: 0, max: 1, valor: P.reverbMix,
+      formato: v => fmt(v * 100, 0) + ' %', onCambio: v => { P.reverbMix = v; aplicar(); } }),
+    M.perilla({ nombre: 'Seco', min: 0, max: 1, valor: P.seco,
+      formato: v => fmt(v * 100, 0) + ' %', onCambio: v => { P.seco = v; aplicar(); } })
+  ]);
+
+  const rec = M.grabacion({
+    prefijo: 'space2', ancho: 'sp3',
+    preparar: async () => { await prepararAudio(); if (!sonando) await reproducir(); return grabadora; }
+  });
+
+  lienzoTaps = el('canvas.pantalla', { height: 140, style: 'height:140px' });
+  lienzoIr = el('canvas.pantalla', { height: 140, style: 'height:140px' });
+
+  panel.appendChild(M.modulo('Fuente y reloj', [pantalla, el('div', { style: 'height:10px' }), transporte, fuentes, reloj], 'sp5'));
+  panel.appendChild(M.modulo('Delay', [delay, botonPing], 'sp4'));
+  panel.appendChild(rec.modulo);
+  panel.appendChild(M.modulo('Reverb', reverb));
+  panel.appendChild(M.modulo('Repeticiones', lienzoTaps, 'sp6'));
+  panel.appendChild(M.modulo('Respuesta al impulso', lienzoIr, 'sp6'));
+
+  $('#maquina').appendChild(maquina);
+  marcarFuente();
+}
+
+function marcarFuente() {
+  Object.entries(botonesFuente).forEach(([clave, b]) => b.encender(clave === fuente));
+  pintarLcd();
+}
+
+function pintarLcd() {
+  const td = tiempoDelay();
+  const figura = FIGURAS.find(f => f[0] === P.figura);
+  pantalla.escribir(
+    '<div class="fila"><span class="grande">' + fmt(td * 1000, 0) + '</span>' +
+    '<span class="tenue">ms por repetición</span></div>' +
+    '<div class="fila"><span class="tenue">' + (figura ? figura[1] : 'libre') + ' a ' + fmt(bpm, 0) + ' BPM</span>' +
+    '<span class="tenue">' + (pingpong ? 'ping-pong' : 'mono') + '</span></div>' +
+    '<div class="fila"><span class="tenue">cola de reverb</span>' +
+    '<span class="tenue">' + (irBuffer ? fmt(irBuffer.duration, 2) + ' s' : '—') + '</span></div>'
+  );
+}
+
+/* ================= dibujo ================= */
+
+function lienzo(canvas, alto) {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const w = canvas.clientWidth || 400;
+  canvas.width = Math.round(w * dpr);
+  canvas.height = Math.round(alto * dpr);
+  const g = canvas.getContext('2d');
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.clearRect(0, 0, w, alto);
+  g.fillStyle = '#0d1a12';
+  g.fillRect(0, 0, w, alto);
+  return { g, w, h: alto };
+}
+
+function dibujarTaps() {
+  const { g, w, h } = lienzo(lienzoTaps, 140);
+  const pad = 12, td = tiempoDelay();
+  const total = Math.max(1.6, td * 8);
+  g.strokeStyle = 'rgba(125,240,168,.2)';
+  g.beginPath(); g.moveTo(pad, h / 2); g.lineTo(w - pad, h / 2); g.stroke();
+
+  let amp = 1;
+  for (let k = 0; k < 14; k++) {
+    const tiempo = k * (pingpong ? td / 2 : td);
+    if (tiempo > total) break;
+    const x = pad + tiempo / total * (w - 2 * pad);
+    const alto = amp * (h / 2 - 16);
+    const arriba = !pingpong || k % 2 === 0;
+    g.strokeStyle = k === 0 ? '#e9e4d8' : '#e7b93d';
+    g.lineWidth = k === 0 ? 2.5 : 2;
+    g.beginPath();
+    g.moveTo(x, h / 2);
+    g.lineTo(x, h / 2 + (arriba ? -alto : alto));
+    g.stroke();
+    if (k) amp *= P.feedback;
+  }
+  g.fillStyle = 'rgba(125,240,168,.6)';
+  g.font = '10px ui-monospace, monospace';
+  g.textAlign = 'left';
+  g.fillText('L', 5, 14);
+  g.fillText('R', 5, h - 6);
+  g.textAlign = 'right';
+  g.fillText(fmt(total, 2) + ' s', w - 5, h - 6);
+}
+
+function dibujarIR() {
+  if (!lienzoIr) return;
+  const { g, w, h } = lienzo(lienzoIr, 140);
+  if (!irBuffer) return;
+  const d = irBuffer.getChannelData(0), paso = Math.max(1, Math.floor(d.length / w));
+  g.beginPath();
+  for (let x = 0; x < w; x++) {
+    let max = 0;
+    for (let i = 0; i < paso; i++) max = Math.max(max, Math.abs(d[x * paso + i] || 0));
+    const alto = max * (h / 2 - 8) * 3.2;
+    g.moveTo(x, h / 2 - alto); g.lineTo(x, h / 2 + alto);
+  }
+  g.strokeStyle = '#7df0a8'; g.lineWidth = 1; g.stroke();
+  g.fillStyle = 'rgba(125,240,168,.6)';
+  g.font = '10px ui-monospace, monospace';
+  g.textAlign = 'right';
+  g.fillText(fmt(irBuffer.duration, 2) + ' s de cola', w - 5, h - 6);
+}
+
+construir();
+regenerarIR();
+dibujarTaps();
+pintarLcd();
+window.addEventListener('resize', () => { dibujarTaps(); dibujarIR(); });
+</script>
+</body>
+</html>

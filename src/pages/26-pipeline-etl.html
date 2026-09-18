@@ -1,0 +1,293 @@
+<!--meta
+{
+  "id": "26",
+  "title": "Pipeline ETL de listas de precios",
+  "tagline": "Pega la lista sucia que llegó del proveedor y mira cómo cada etapa la limpia, valida y transforma, con el registro de qué fila se cayó y por qué.",
+  "area": "backend",
+  "stack": ["JavaScript", "ETL", "Validación"],
+  "libs": ["../assets/datos-comercial.js"],
+  "highlights": [
+    "Analizador de CSV que respeta comillas, separadores mixtos y decimales con coma",
+    "Cada etapa informa cuántas filas entraron, salieron y se rechazaron",
+    "Salida en tres formatos: tabla limpia, JSON e INSERT de SQL"
+  ]
+}
+-->
+
+<div class="cols-2" style="grid-template-columns:minmax(0,1fr) minmax(0,1.3fr)">
+  <div class="stack">
+    <section class="panel">
+      <h2>Entrada</h2>
+      <div class="field">
+        <label for="crudo">Lista del proveedor (CSV o texto separado)</label>
+        <textarea id="crudo" spellcheck="false" style="min-height:230px;font-size:12px"></textarea>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <button class="primary" id="correr">Ejecutar pipeline</button>
+        <button class="sm" id="ejemplo">Cargar lista de ejemplo</button>
+        <button class="sm" id="sucia">Cargar lista con errores</button>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Etapas</h2>
+      <div id="etapas" class="stack" style="gap:10px"></div>
+    </section>
+  </div>
+
+  <div class="stack">
+    <section class="panel">
+      <h2>Registro del proceso</h2>
+      <div class="console" id="log" style="max-height:240px"></div>
+    </section>
+
+    <section class="panel">
+      <h2>Salida</h2>
+      <div class="seg" id="formato" style="margin-bottom:12px">
+        <button aria-pressed="true" data-f="tabla">Tabla</button>
+        <button aria-pressed="false" data-f="json">JSON</button>
+        <button aria-pressed="false" data-f="sql">SQL</button>
+        <button aria-pressed="false" data-f="errores">Rechazos</button>
+      </div>
+      <div id="salida" class="tablewrap" style="max-height:420px;overflow:auto"></div>
+    </section>
+  </div>
+</div>
+
+<script>
+const { $, $$, el, fmt, logger } = CODE;
+const { PRODUCTOS } = DATOS;
+
+let limpio = [], rechazos = [], formato = 'tabla';
+const log = logger($('#log'));
+
+const EJEMPLO = `codigo;descripcion;marca;unidad;precio lista;precio mayorista;stock
+EMB-101;Hot dog de pollo;Cerdeña;kg;12,90;11,40;380
+EMB-104;Chorizo parrillero;Cerdeña;kg;S/ 21.90;19,40;95
+LAC-403;Queso mozzarella pizzero;Piamonte;kg;33,90;30,10;96
+LAC-602;"Crema de leche, tetra";Parmalat;und;13,60;12,00;210
+EMB-301;Nuggets de pollo apanados;Delys;kg;19,20;17,00;130`;
+
+const SUCIA = `codigo;descripcion;marca;unidad;precio lista;precio mayorista;stock
+ emb-101 ;Hot dog de pollo;Cerdeña;KG;12,90;11,40;380
+EMB-104;Chorizo parrillero;Cerdeña;kg;S/ 21.90;19,40;95
+;Producto sin código;Cerdeña;kg;15,00;13,00;10
+LAC-403;Queso mozzarella pizzero;Piamonte;kg;33,90;35,00;96
+LAC-999;Queso fantasma;Desconocida;kg;abc;12,00;40
+EMB-101;Hot dog de pollo duplicado;Cerdeña;kg;12,90;11,40;380
+LAC-602;"Crema de leche, tetra";Parmalat;und;13,60;12,00;-5
+EMB-301;Nuggets de pollo apanados;Delys;kg;19,20;17,00;130`;
+
+/* ---- extracción: CSV con comillas y separador detectado ---- */
+function separarLinea(linea, sep) {
+  const salida = [];
+  let actual = '', comillas = false;
+  for (let i = 0; i < linea.length; i++) {
+    const c = linea[i];
+    if (c === '"') { comillas = !comillas; continue; }
+    if (c === sep && !comillas) { salida.push(actual); actual = ''; continue; }
+    actual += c;
+  }
+  salida.push(actual);
+  return salida;
+}
+
+function extraer(texto) {
+  const lineas = texto.split(/\r?\n/).filter(l => l.trim());
+  if (!lineas.length) return { cabecera: [], filas: [] };
+  const sep = [';', '\t', ','].map(s => ({ s, n: (lineas[0].match(new RegExp('\\' + s, 'g')) || []).length }))
+    .sort((a, b) => b.n - a.n)[0].s;
+  log.line('Separador detectado: «' + (sep === '\t' ? 'tabulación' : sep) + '»', 'c-mut');
+  const cabecera = separarLinea(lineas[0], sep).map(h => h.trim().toLowerCase());
+  const filas = lineas.slice(1).map((l, i) => {
+    const celdas = separarLinea(l, sep);
+    const o = { __linea: i + 2 };
+    cabecera.forEach((h, k) => { o[h] = (celdas[k] ?? '').trim(); });
+    return o;
+  });
+  return { cabecera, filas, sep };
+}
+
+const ALIAS = {
+  codigo: 'sku', 'código': 'sku', sku: 'sku',
+  descripcion: 'nombre', 'descripción': 'nombre', producto: 'nombre', nombre: 'nombre',
+  marca: 'marca', unidad: 'unidad',
+  'precio lista': 'lista', 'p. lista': 'lista', lista: 'lista',
+  'precio mayorista': 'mayorista', mayorista: 'mayorista',
+  stock: 'stock', existencia: 'stock'
+};
+
+function numero(txt) {
+  if (txt == null) return NaN;
+  const limpio = String(txt).replace(/s\/?\.?/i, '').replace(/[^\d,.\-]/g, '').trim();
+  if (!limpio) return NaN;
+  // Coma como separador decimal cuando no hay punto después de ella.
+  const normal = limpio.includes(',') && !/\.\d{1,2}$/.test(limpio)
+    ? limpio.replace(/\./g, '').replace(',', '.')
+    : limpio.replace(/,/g, '');
+  return parseFloat(normal);
+}
+
+function correr() {
+  log.clear();
+  rechazos = [];
+  const t0 = performance.now();
+
+  log.line('▸ EXTRAER', 'c-acc');
+  const { cabecera, filas } = extraer($('#crudo').value);
+  log.line('  ' + filas.length + ' filas leídas · columnas: ' + cabecera.join(', '));
+
+  log.line('\n▸ NORMALIZAR CABECERAS', 'c-acc');
+  const mapa = {};
+  cabecera.forEach(h => { if (ALIAS[h]) mapa[h] = ALIAS[h]; });
+  const noMapeadas = cabecera.filter(h => !ALIAS[h]);
+  log.line('  ' + Object.keys(mapa).length + ' columnas reconocidas' + (noMapeadas.length ? ' · ignoradas: ' + noMapeadas.join(', ') : ''));
+
+  const mapeadas = filas.map(f => {
+    const o = { __linea: f.__linea };
+    Object.entries(mapa).forEach(([origen, destino]) => { o[destino] = f[origen]; });
+    return o;
+  });
+
+  log.line('\n▸ LIMPIAR', 'c-acc');
+  const limpias = mapeadas.map(f => ({
+    __linea: f.__linea,
+    sku: String(f.sku || '').trim().toUpperCase(),
+    nombre: String(f.nombre || '').trim().replace(/\s+/g, ' '),
+    marca: String(f.marca || '').trim(),
+    unidad: String(f.unidad || '').trim().toLowerCase(),
+    lista: numero(f.lista),
+    mayorista: numero(f.mayorista),
+    stock: numero(f.stock)
+  }));
+  log.line('  Códigos en mayúscula, espacios colapsados, decimales con coma convertidos');
+
+  log.line('\n▸ VALIDAR', 'c-acc');
+  const vistos = new Set();
+  const catalogo = new Set(PRODUCTOS.map(p => p.sku));
+  limpio = [];
+  limpias.forEach(f => {
+    const motivos = [];
+    if (!/^[A-Z]{3}-\d{3}$/.test(f.sku)) motivos.push('SKU vacío o con formato inválido');
+    if (!f.nombre) motivos.push('descripción vacía');
+    if (!Number.isFinite(f.lista) || f.lista <= 0) motivos.push('precio de lista no numérico');
+    if (!Number.isFinite(f.mayorista) || f.mayorista <= 0) motivos.push('precio mayorista no numérico');
+    else if (Number.isFinite(f.lista) && f.mayorista > f.lista) motivos.push('el mayorista supera al precio de lista');
+    if (!Number.isFinite(f.stock) || f.stock < 0) motivos.push('stock negativo o no numérico');
+    if (vistos.has(f.sku)) motivos.push('SKU duplicado en el archivo');
+    if (f.sku && !catalogo.has(f.sku)) motivos.push('SKU no existe en el catálogo maestro');
+    if (motivos.length) { rechazos.push({ ...f, motivos }); return; }
+    vistos.add(f.sku);
+    limpio.push(f);
+  });
+  log.line('  ' + limpio.length + ' válidas · ' + rechazos.length + ' rechazadas', rechazos.length ? 'c-bad' : 'c-ok');
+
+  log.line('\n▸ TRANSFORMAR', 'c-acc');
+  limpio = limpio.map(f => {
+    const maestro = PRODUCTOS.find(p => p.sku === f.sku);
+    const costo = maestro ? maestro.costo : f.mayorista * 0.8;
+    return {
+      sku: f.sku, nombre: f.nombre, marca: f.marca, unidad: f.unidad,
+      lista: +f.lista.toFixed(2), mayorista: +f.mayorista.toFixed(2), stock: f.stock,
+      margen_pct: +((f.lista - costo) / f.lista * 100).toFixed(1),
+      valorizado: +(f.stock * costo).toFixed(2)
+    };
+  });
+  log.line('  Margen y valorizado calculados contra el costo del catálogo maestro');
+
+  const ms = performance.now() - t0;
+  log.line('\n▸ CARGAR', 'c-acc');
+  log.line('  ' + limpio.length + ' registros listos · ' + fmt(ms, 1) + ' ms', 'c-ok');
+
+  pintarEtapas([
+    ['Extraer', filas.length, 0],
+    ['Normalizar', mapeadas.length, 0],
+    ['Limpiar', limpias.length, 0],
+    ['Validar', limpio.length, rechazos.length],
+    ['Transformar', limpio.length, 0]
+  ]);
+  pintarSalida();
+}
+
+function pintarEtapas(etapas) {
+  const cont = $('#etapas'); cont.textContent = '';
+  const max = Math.max(...etapas.map(e => e[1] + e[2]), 1);
+  etapas.forEach(([nombre, ok, mal]) => {
+    cont.appendChild(el('div', null, [
+      el('div.row', { style: 'justify-content:space-between' }, [
+        el('span', { class: 'lbl', text: nombre }),
+        el('span', { style: 'font:600 12px var(--mono)', text: ok + (mal ? ' · ' + mal + ' rechazadas' : '') })
+      ]),
+      el('div', { style: 'display:flex;height:9px;border-radius:2px;overflow:hidden;background:var(--surface-2);margin-top:5px' }, [
+        el('div', { style: `width:${ok / max * 100}%;background:var(--accent)` }),
+        el('div', { style: `width:${mal / max * 100}%;background:var(--bad)` })
+      ])
+    ]));
+  });
+}
+
+function pintarSalida() {
+  const cont = $('#salida');
+  cont.textContent = '';
+  cont.className = formato === 'tabla' || formato === 'errores' ? 'tablewrap' : '';
+
+  if (formato === 'tabla') {
+    if (!limpio.length) { cont.appendChild(el('p', { text: 'Sin registros válidos.', style: 'color:var(--muted);padding:12px' })); return; }
+    const cols = Object.keys(limpio[0]);
+    cont.appendChild(el('table', null, [
+      el('thead', null, el('tr', null, cols.map(c => el('th', { text: c })))),
+      el('tbody', null, limpio.map(f => el('tr', null, cols.map(c =>
+        el(typeof f[c] === 'number' ? 'td.num' : 'td', { text: String(f[c]) })))))
+    ]));
+  } else if (formato === 'errores') {
+    if (!rechazos.length) { cont.appendChild(el('p', { text: 'Ninguna fila rechazada.', style: 'color:var(--good);padding:12px' })); return; }
+    cont.appendChild(el('table', null, [
+      el('thead', null, el('tr', null, [el('th', { text: 'Línea' }), el('th', { text: 'SKU' }), el('th', { text: 'Motivos' })])),
+      el('tbody', null, rechazos.map(r => el('tr', null, [
+        el('td.num', { text: r.__linea }),
+        el('td', { text: r.sku || '—' }),
+        el('td', { text: r.motivos.join(' · '), style: 'white-space:normal;color:var(--bad)' })
+      ])))
+    ]));
+  } else if (formato === 'json') {
+    cont.appendChild(el('div.console', { text: JSON.stringify(limpio, null, 2), style: 'max-height:420px' }));
+  } else {
+    const sql = limpio.map(f =>
+      `INSERT INTO productos (sku, nombre, marca, unidad, precio_lista, precio_mayorista, stock)\n` +
+      `VALUES ('${f.sku}', '${f.nombre.replace(/'/g, "''")}', '${f.marca}', '${f.unidad}', ${f.lista}, ${f.mayorista}, ${f.stock})\n` +
+      `ON CONFLICT (sku) DO UPDATE SET precio_lista = EXCLUDED.precio_lista, precio_mayorista = EXCLUDED.precio_mayorista, stock = EXCLUDED.stock;`
+    ).join('\n\n');
+    cont.appendChild(el('div.console', { text: sql || '-- sin registros', style: 'max-height:420px' }));
+  }
+}
+
+$$('#formato button').forEach(b => b.addEventListener('click', () => {
+  $$('#formato button').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+  formato = b.dataset.f;
+  pintarSalida();
+}));
+$('#correr').addEventListener('click', correr);
+$('#ejemplo').addEventListener('click', () => { $('#crudo').value = EJEMPLO; correr(); });
+$('#sucia').addEventListener('click', () => { $('#crudo').value = SUCIA; correr(); });
+
+$('#crudo').value = SUCIA;
+correr();
+
+/* ---- exportación de resultados ---- */
+const X = CODE.exportar;
+X.registrar(() => ({
+  titulo: 'Resultado del pipeline ETL',
+  subtitulo: limpio.length + ' registros válidos · ' + rechazos.length + ' rechazados',
+  resumen: [
+    { k: 'Registros cargados', v: limpio.length },
+    { k: 'Registros rechazados', v: rechazos.length },
+    { k: 'Valorizado total', v: fmt(limpio.reduce((s, f) => s + f.valorizado, 0), 2) }
+  ],
+  tablas: [
+    limpio.length ? { titulo: 'Registros limpios', columnas: Object.keys(limpio[0]), filas: limpio.map(f => Object.values(f)) } : null,
+    rechazos.length ? { titulo: 'Rechazos', columnas: ['Línea', 'SKU', 'Motivos'], filas: rechazos.map(r => [r.__linea, r.sku || '', r.motivos.join(' · ')]) } : null
+  ].filter(Boolean),
+  nota: 'Cada rechazo indica la línea del archivo original y todas las reglas que incumplió.'
+}));
+
+</script>

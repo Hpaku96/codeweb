@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Presupuesto de obra con análisis de precios unitarios · CODE</title>
+<meta name="description" content="Cuatro partidas con su APU editable: rendimiento y cuadrilla definen la mano de obra, y el resumen arma costo directo, gastos generales, utilidad e IGV.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20100%20100%22%3E%3Ccircle%20cx%3D%2250%22%20cy%3D%2250%22%20r%3D%2241%22%20fill%3D%22none%22%20stroke%3D%22%2523E7B93D%22%20stroke-width%3D%228%22%2F%3E%3Cg%20fill%3D%22none%22%20stroke%3D%22%2523E7B93D%22%20stroke-width%3D%225%22%20stroke-linecap%3D%22round%22%3E%3Cpath%20d%3D%22M30%2026%20L52%2048%22%2F%3E%3Cpath%20d%3D%22M24%2034%20L40%2050%20L40%2058%22%2F%3E%3Cpath%20d%3D%22M20%2044%20L30%2054%20L30%2064%22%2F%3E%3C%2Fg%3E%3Cg%20fill%3D%22%2523E7B93D%22%3E%3Ccircle%20cx%3D%2252%22%20cy%3D%2248%22%20r%3D%225.5%22%2F%3E%3Ccircle%20cx%3D%2240%22%20cy%3D%2258%22%20r%3D%225.5%22%2F%3E%3Ccircle%20cx%3D%2230%22%20cy%3D%2264%22%20r%3D%225.5%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E">
+<script>(function(){try{var t=localStorage.getItem('code-theme');if(t!=='light'&&t!=='dark'){t=matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';}document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="../assets/demo.css">
+
+</head>
+<body>
+<div class="wrap">
+<header class="demo-head">
+  <a class="brand-bar" href="../index.html">
+    <svg viewBox="0 0 100 100" width="20" height="20" aria-hidden="true">
+      <circle cx="50" cy="50" r="41" fill="none" stroke="currentColor" stroke-width="7"/>
+      <g fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round">
+        <path d="M30 26 L52 48"/>
+        <path d="M24 34 L40 50 L40 58"/>
+        <path d="M20 44 L30 54 L30 64"/>
+      </g>
+      <g fill="currentColor">
+        <circle cx="52" cy="48" r="5"/>
+        <circle cx="40" cy="58" r="5"/>
+        <circle cx="30" cy="64" r="5"/>
+      </g>
+    </svg>
+    <span>CODE</span>
+  </a>
+  <span class="idx">07</span>
+  <h1>Presupuesto de obra con análisis de precios unitarios</h1>
+  <div class="head-actions">
+    <button type="button" class="theme-toggle" id="themeToggle" aria-pressed="false"></button>
+    <a class="back" href="../index.html">← Portafolio</a>
+  </div>
+  <p class="sub">Cuatro partidas con su APU editable: rendimiento y cuadrilla definen la mano de obra, y el resumen arma costo directo, gastos generales, utilidad e IGV.</p>
+</header>
+<div class="cols-2" style="grid-template-columns:minmax(0,1.1fr) minmax(0,1fr)">
+  <section class="panel">
+    <h2>Partidas del presupuesto</h2>
+    <div class="tablewrap">
+      <table id="tPartidas">
+        <thead><tr><th>Ítem</th><th>Descripción</th><th>Und</th><th class="num">Metrado</th><th class="num">P. unit.</th><th class="num">Parcial</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div id="gInc" style="margin-top:16px"></div>
+  </section>
+
+  <div class="stack">
+    <section class="panel">
+      <h2 id="apuTitulo">Análisis de precios unitarios</h2>
+      <div class="row" style="gap:14px;margin-bottom:12px">
+        <div class="field" style="min-width:120px"><label for="rend">Rendimiento / día</label><input type="number" id="rend" step="0.5"></div>
+        <div class="field" style="min-width:110px"><label for="metr">Metrado</label><input type="number" id="metr" step="0.5"></div>
+      </div>
+      <div class="tablewrap">
+        <table id="tApu">
+          <thead><tr><th>Insumo</th><th>Und</th><th class="num">Cuadr.</th><th class="num">Cant.</th><th class="num">Precio</th><th class="num">Parcial</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <dl class="kv" style="margin-top:14px">
+        <dt>Mano de obra</dt><dd id="sMO">—</dd>
+        <dt>Materiales</dt><dd id="sMAT">—</dd>
+        <dt>Equipos y herramientas</dt><dd id="sEQ">—</dd>
+        <dt><strong>Costo unitario directo</strong></dt><dd id="sTOT">—</dd>
+      </dl>
+    </section>
+
+    <section class="panel">
+      <h2>Resumen del presupuesto</h2>
+      <div class="row" style="gap:14px;margin-bottom:12px">
+        <div class="field" style="min-width:110px"><label for="gg">Gastos grales. %</label><input type="number" id="gg" value="10" step="0.5"></div>
+        <div class="field" style="min-width:110px"><label for="ut">Utilidad %</label><input type="number" id="ut" value="8" step="0.5"></div>
+        <div class="field" style="min-width:110px"><label for="igv">IGV %</label><input type="number" id="igv" value="18" step="1"></div>
+      </div>
+      <dl class="kv">
+        <dt>Costo directo</dt><dd id="cd">—</dd>
+        <dt>Gastos generales</dt><dd id="rgg">—</dd>
+        <dt>Utilidad</dt><dd id="rut">—</dd>
+        <dt>Subtotal</dt><dd id="sub">—</dd>
+        <dt>IGV</dt><dd id="rigv">—</dd>
+      </dl>
+      <div class="readout hi" style="margin-top:14px"><span class="k">Presupuesto total</span><span class="v" id="total">—</span></div>
+    </section>
+  </div>
+</div>
+<footer class="demo-foot">
+  <span>CODE · Ingeniería · demo 07 de 30</span>
+  <span>JavaScript · Maestro-detalle · SVG</span>
+</footer>
+</div>
+<script src="../assets/demo.js"></script>
+<script src="../assets/exportar.js"></script>
+
+<script>
+const { $, el, num, fmt, soles, token, barChart, draw, onThemeChange } = CODE;
+
+const partidas = [
+  {
+    item: '01.01', desc: "Concreto f'c = 210 kg/cm² en zapatas", und: 'm³', metrado: 48.5, rend: 20,
+    insumos: [
+      { t: 'MO', d: 'Capataz', u: 'hh', cuad: 0.1, p: 26.50 },
+      { t: 'MO', d: 'Operario', u: 'hh', cuad: 2, p: 23.00 },
+      { t: 'MO', d: 'Oficial', u: 'hh', cuad: 2, p: 18.50 },
+      { t: 'MO', d: 'Peón', u: 'hh', cuad: 8, p: 16.70 },
+      { t: 'MAT', d: 'Cemento Portland tipo I', u: 'bol', cant: 9.5, p: 27.50 },
+      { t: 'MAT', d: 'Piedra chancada 3/4"', u: 'm³', cant: 0.55, p: 65.00 },
+      { t: 'MAT', d: 'Arena gruesa', u: 'm³', cant: 0.54, p: 60.00 },
+      { t: 'MAT', d: 'Agua potable', u: 'm³', cant: 0.185, p: 8.00 },
+      { t: 'EQ', d: 'Mezcladora de concreto 9 p³', u: 'hm', cuad: 1, p: 25.00 },
+      { t: 'EQ', d: 'Vibrador de concreto 4 HP', u: 'hm', cuad: 1, p: 12.00 },
+      { t: 'HM', d: 'Herramientas manuales', u: '%mo', pct: 3 }
+    ]
+  },
+  {
+    item: '01.02', desc: 'Encofrado y desencofrado normal en zapatas', und: 'm²', metrado: 96, rend: 16,
+    insumos: [
+      { t: 'MO', d: 'Operario', u: 'hh', cuad: 1, p: 23.00 },
+      { t: 'MO', d: 'Oficial', u: 'hh', cuad: 1, p: 18.50 },
+      { t: 'MAT', d: 'Madera tornillo', u: 'p²', cant: 4.2, p: 6.20 },
+      { t: 'MAT', d: 'Clavos de 3"', u: 'kg', cant: 0.2, p: 5.50 },
+      { t: 'MAT', d: 'Alambre negro n° 8', u: 'kg', cant: 0.2, p: 5.20 },
+      { t: 'MAT', d: 'Desmoldante', u: 'gal', cant: 0.03, p: 48.00 },
+      { t: 'HM', d: 'Herramientas manuales', u: '%mo', pct: 3 }
+    ]
+  },
+  {
+    item: '01.03', desc: 'Acero de refuerzo fy = 4200 kg/cm² en zapatas', und: 'kg', metrado: 1980, rend: 260,
+    insumos: [
+      { t: 'MO', d: 'Operario', u: 'hh', cuad: 1, p: 23.00 },
+      { t: 'MO', d: 'Oficial', u: 'hh', cuad: 1, p: 18.50 },
+      { t: 'MAT', d: 'Acero corrugado fy = 4200', u: 'kg', cant: 1.05, p: 4.35 },
+      { t: 'MAT', d: 'Alambre negro n° 16', u: 'kg', cant: 0.06, p: 5.20 },
+      { t: 'HM', d: 'Herramientas manuales', u: '%mo', pct: 3 }
+    ]
+  },
+  {
+    item: '01.04', desc: 'Excavación manual en terreno normal', und: 'm³', metrado: 72, rend: 4,
+    insumos: [
+      { t: 'MO', d: 'Peón', u: 'hh', cuad: 1, p: 16.70 },
+      { t: 'HM', d: 'Herramientas manuales', u: '%mo', pct: 5 }
+    ]
+  }
+];
+
+const ETIQUETA = { MO: 'Mano de obra', MAT: 'Materiales', EQ: 'Equipos', HM: 'Equipos' };
+let sel = 0;
+
+function cantidadDe(ins, rend) {
+  if (ins.t === 'MO' || ins.t === 'EQ') return (ins.cuad || 0) * 8 / (rend || 1);
+  if (ins.t === 'HM') return 1;
+  return ins.cant || 0;
+}
+
+function costoUnitario(p) {
+  let mo = 0, mat = 0, eq = 0;
+  p.insumos.forEach(i => {
+    if (i.t === 'HM') return;
+    const parcial = cantidadDe(i, p.rend) * i.p;
+    if (i.t === 'MO') mo += parcial; else if (i.t === 'MAT') mat += parcial; else eq += parcial;
+  });
+  p.insumos.filter(i => i.t === 'HM').forEach(i => { eq += mo * (i.pct || 0) / 100; });
+  return { mo, mat, eq, total: mo + mat + eq };
+}
+
+function pintarPartidas() {
+  const tb = $('#tPartidas tbody'); tb.textContent = '';
+  partidas.forEach((p, i) => {
+    const c = costoUnitario(p);
+    const tr = el('tr', { tabindex: '0', style: 'cursor:pointer' }, [
+      el('td', { text: p.item }),
+      el('td', { text: p.desc, style: 'white-space:normal;min-width:190px' }),
+      el('td', { text: p.und }),
+      el('td.num', { text: fmt(p.metrado, 2) }),
+      el('td.num', { text: fmt(c.total, 2) }),
+      el('td.num', { text: fmt(c.total * p.metrado, 2) })
+    ]);
+    if (i === sel) tr.style.background = 'var(--accent-soft)';
+    const abrir = () => { sel = i; render(); };
+    tr.addEventListener('click', abrir);
+    tr.addEventListener('keydown', e => { if (e.key === 'Enter') abrir(); });
+    tb.appendChild(tr);
+  });
+}
+
+function pintarApu() {
+  const p = partidas[sel];
+  $('#apuTitulo').textContent = 'APU · ' + p.item + ' — ' + p.desc;
+  $('#rend').value = p.rend;
+  $('#metr').value = p.metrado;
+
+  const tb = $('#tApu tbody'); tb.textContent = '';
+  let grupoActual = '';
+  p.insumos.forEach((ins, i) => {
+    const g = ETIQUETA[ins.t];
+    if (g !== grupoActual) {
+      grupoActual = g;
+      tb.appendChild(el('tr', null, el('td', { colspan: 6, text: g, style: 'font:600 10px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);background:var(--surface-2)' })));
+    }
+    const editable = (key, step) => {
+      const inp = el('input', { type: 'number', value: ins[key], step: step, 'aria-label': key + ' ' + ins.d });
+      inp.addEventListener('input', () => { ins[key] = num(inp.value, 0); render(); });
+      return inp;
+    };
+    const cant = cantidadDe(ins, p.rend);
+    const c = costoUnitario(p);
+    const parcial = ins.t === 'HM' ? c.mo * (ins.pct || 0) / 100 : cant * ins.p;
+    tb.appendChild(el('tr', null, [
+      el('td', { text: ins.d, style: 'white-space:normal;min-width:160px' }),
+      el('td', { text: ins.u }),
+      el('td.num', null, ins.t === 'MO' || ins.t === 'EQ' ? editable('cuad', '0.1') : (ins.t === 'HM' ? editable('pct', '0.5') : el('span', { text: '—' }))),
+      el('td.num', { text: ins.t === 'HM' ? '—' : fmt(ins.t === 'MAT' ? ins.cant : cant, 4) }),
+      el('td.num', null, ins.t === 'HM' ? el('span', { text: '—' }) : editable('p', '0.1')),
+      el('td.num', { text: fmt(parcial, 2) })
+    ]));
+  });
+
+  const c = costoUnitario(p);
+  $('#sMO').textContent = soles(c.mo);
+  $('#sMAT').textContent = soles(c.mat);
+  $('#sEQ').textContent = soles(c.eq);
+  $('#sTOT').textContent = soles(c.total) + ' / ' + p.und;
+}
+
+function pintarResumen() {
+  const cd = partidas.reduce((s, p) => s + costoUnitario(p).total * p.metrado, 0);
+  const gg = cd * num($('#gg').value, 0) / 100;
+  const ut = cd * num($('#ut').value, 0) / 100;
+  const sub = cd + gg + ut;
+  const igv = sub * num($('#igv').value, 0) / 100;
+  $('#cd').textContent = soles(cd);
+  $('#rgg').textContent = soles(gg);
+  $('#rut').textContent = soles(ut);
+  $('#sub').textContent = soles(sub);
+  $('#rigv').textContent = soles(igv);
+  $('#total').textContent = soles(sub + igv);
+
+  draw($('#gInc'), barChart({
+    data: partidas.map((p, i) => ({
+      label: p.item,
+      value: costoUnitario(p).total * p.metrado / (cd || 1) * 100,
+      color: i === sel ? token('accent') : token('blue')
+    })),
+    w: 560, h: 210, showValues: true, yFmt: v => fmt(v, 0) + '%'
+  }));
+}
+
+function render() { pintarPartidas(); pintarApu(); pintarResumen(); }
+
+$('#rend').addEventListener('input', e => { partidas[sel].rend = Math.max(0.1, num(e.target.value, 1)); render(); });
+$('#metr').addEventListener('input', e => { partidas[sel].metrado = num(e.target.value, 0); render(); });
+['#gg', '#ut', '#igv'].forEach(s => $(s).addEventListener('input', pintarResumen));
+onThemeChange(render);
+render();
+
+/* ---- exportación de resultados ---- */
+const X = CODE.exportar;
+X.registrar(() => ({
+  titulo: 'Presupuesto de obra',
+  subtitulo: partidas.length + ' partidas · análisis de precios unitarios',
+  resumen: X.desdeKv('.kv').concat(X.desdeReadouts()),
+  tablas: [
+    Object.assign(X.desdeTabla('#tPartidas'), { titulo: 'Partidas del presupuesto' }),
+    Object.assign(X.desdeTabla('#tApu'), { titulo: 'APU · ' + partidas[sel].item + ' ' + partidas[sel].desc })
+  ],
+  nota: 'La mano de obra sale de cuadrilla × 8 / rendimiento; las herramientas manuales, como porcentaje de la mano de obra.'
+}));
+</script>
+</body>
+</html>

@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Firma y verificación de tokens JWT · CODE</title>
+<meta name="description" content="SHA-256 y HMAC implementados a mano para firmar y verificar tokens HS256: edita la carga útil y observa cómo la firma deja de coincidir al instante.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20100%20100%22%3E%3Ccircle%20cx%3D%2250%22%20cy%3D%2250%22%20r%3D%2241%22%20fill%3D%22none%22%20stroke%3D%22%2523E7B93D%22%20stroke-width%3D%228%22%2F%3E%3Cg%20fill%3D%22none%22%20stroke%3D%22%2523E7B93D%22%20stroke-width%3D%225%22%20stroke-linecap%3D%22round%22%3E%3Cpath%20d%3D%22M30%2026%20L52%2048%22%2F%3E%3Cpath%20d%3D%22M24%2034%20L40%2050%20L40%2058%22%2F%3E%3Cpath%20d%3D%22M20%2044%20L30%2054%20L30%2064%22%2F%3E%3C%2Fg%3E%3Cg%20fill%3D%22%2523E7B93D%22%3E%3Ccircle%20cx%3D%2252%22%20cy%3D%2248%22%20r%3D%225.5%22%2F%3E%3Ccircle%20cx%3D%2240%22%20cy%3D%2258%22%20r%3D%225.5%22%2F%3E%3Ccircle%20cx%3D%2230%22%20cy%3D%2264%22%20r%3D%225.5%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E">
+<script>(function(){try{var t=localStorage.getItem('code-theme');if(t!=='light'&&t!=='dark'){t=matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';}document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="../assets/demo.css">
+
+</head>
+<body>
+<div class="wrap">
+<header class="demo-head">
+  <a class="brand-bar" href="../index.html">
+    <svg viewBox="0 0 100 100" width="20" height="20" aria-hidden="true">
+      <circle cx="50" cy="50" r="41" fill="none" stroke="currentColor" stroke-width="7"/>
+      <g fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round">
+        <path d="M30 26 L52 48"/>
+        <path d="M24 34 L40 50 L40 58"/>
+        <path d="M20 44 L30 54 L30 64"/>
+      </g>
+      <g fill="currentColor">
+        <circle cx="52" cy="48" r="5"/>
+        <circle cx="40" cy="58" r="5"/>
+        <circle cx="30" cy="64" r="5"/>
+      </g>
+    </svg>
+    <span>CODE</span>
+  </a>
+  <span class="idx">27</span>
+  <h1>Firma y verificación de tokens JWT</h1>
+  <div class="head-actions">
+    <button type="button" class="theme-toggle" id="themeToggle" aria-pressed="false"></button>
+    <a class="back" href="../index.html">← Portafolio</a>
+  </div>
+  <p class="sub">SHA-256 y HMAC implementados a mano para firmar y verificar tokens HS256: edita la carga útil y observa cómo la firma deja de coincidir al instante.</p>
+</header>
+<div class="cols-2" style="grid-template-columns:minmax(0,1fr) minmax(0,1.2fr)">
+  <div class="stack">
+    <section class="panel">
+      <h2>Emitir token</h2>
+      <div class="field"><label for="secreto">Secreto compartido (HS256)</label><input type="text" id="secreto" value="clave-de-firma-del-servicio-code"></div>
+      <div class="field" style="margin-top:12px"><label for="cabecera">Cabecera</label><textarea id="cabecera" spellcheck="false" style="min-height:80px">{"alg":"HS256","typ":"JWT"}</textarea></div>
+      <div class="field" style="margin-top:12px"><label for="carga">Carga útil (claims)</label><textarea id="carga" spellcheck="false" style="min-height:190px"></textarea></div>
+      <div class="row" style="margin-top:12px">
+        <button class="primary" id="firmar">Firmar</button>
+        <button class="sm" id="expirado">Emitir uno ya expirado</button>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Prueba de manipulación</h2>
+      <p class="note">Cambia un carácter del token y vuelve a verificar: la firma depende de cada byte de la cabecera y de la carga, así que cualquier edición la invalida.</p>
+      <div class="row" style="margin-top:12px">
+        <button class="sm" id="manipular">Alterar el rol a «admin»</button>
+        <button class="sm" id="restaurar">Restaurar el token firmado</button>
+      </div>
+    </section>
+  </div>
+
+  <div class="stack">
+    <section class="panel">
+      <h2>Token</h2>
+      <div class="console" id="token" style="word-break:break-all;max-height:170px"></div>
+      <div class="field" style="margin-top:12px">
+        <label for="entrada">Token a verificar</label>
+        <textarea id="entrada" spellcheck="false" style="min-height:110px;font-size:12px"></textarea>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <button class="primary" id="verificar">Verificar</button>
+        <div class="field" style="min-width:190px"><label for="emisor">Emisor esperado (iss)</label><input type="text" id="emisor" value="code.pe"></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Resultado de la verificación</h2>
+      <div id="chips" class="row" style="margin-bottom:12px"></div>
+      <div class="tablewrap"><table><thead><tr><th>Claim</th><th>Valor</th><th>Significado</th></tr></thead><tbody id="claims"></tbody></table></div>
+    </section>
+  </div>
+</div>
+<footer class="demo-foot">
+  <span>CODE · Backend y datos · demo 27 de 30</span>
+  <span>JavaScript · Criptografía · JWT</span>
+</footer>
+</div>
+<script src="../assets/demo.js"></script>
+<script src="../assets/exportar.js"></script>
+
+<script>
+const { $, el, fmt } = CODE;
+
+/* ---------- SHA-256 ---------- */
+const K = [
+  0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,
+  0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,
+  0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,
+  0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,
+  0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,
+  0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,
+  0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,
+  0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2
+];
+const rotr = (x, n) => (x >>> n) | (x << (32 - n));
+
+function sha256(bytes) {
+  const largo = bytes.length;
+  const conRelleno = new Uint8Array((((largo + 9) >> 6) + 1) << 6);
+  conRelleno.set(bytes);
+  conRelleno[largo] = 0x80;
+  const vista = new DataView(conRelleno.buffer);
+  vista.setUint32(conRelleno.length - 4, largo * 8, false);
+
+  let h = [0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19];
+  const w = new Uint32Array(64);
+
+  for (let bloque = 0; bloque < conRelleno.length; bloque += 64) {
+    for (let i = 0; i < 16; i++) w[i] = vista.getUint32(bloque + i * 4, false);
+    for (let i = 16; i < 64; i++) {
+      const s0 = rotr(w[i - 15], 7) ^ rotr(w[i - 15], 18) ^ (w[i - 15] >>> 3);
+      const s1 = rotr(w[i - 2], 17) ^ rotr(w[i - 2], 19) ^ (w[i - 2] >>> 10);
+      w[i] = (w[i - 16] + s0 + w[i - 7] + s1) >>> 0;
+    }
+    let [a, b, c, d, e, f, g, hh] = h;
+    for (let i = 0; i < 64; i++) {
+      const S1 = rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25);
+      const ch = (e & f) ^ (~e & g);
+      const t1 = (hh + S1 + ch + K[i] + w[i]) >>> 0;
+      const S0 = rotr(a, 2) ^ rotr(a, 13) ^ rotr(a, 22);
+      const maj = (a & b) ^ (a & c) ^ (b & c);
+      const t2 = (S0 + maj) >>> 0;
+      hh = g; g = f; f = e; e = (d + t1) >>> 0;
+      d = c; c = b; b = a; a = (t1 + t2) >>> 0;
+    }
+    h = h.map((v, i) => (v + [a, b, c, d, e, f, g, hh][i]) >>> 0);
+  }
+  const salida = new Uint8Array(32);
+  h.forEach((v, i) => { salida[i * 4] = v >>> 24; salida[i * 4 + 1] = (v >>> 16) & 255; salida[i * 4 + 2] = (v >>> 8) & 255; salida[i * 4 + 3] = v & 255; });
+  return salida;
+}
+
+/* ---------- HMAC-SHA256 ---------- */
+function hmac(claveBytes, mensajeBytes) {
+  const B = 64;
+  let clave = claveBytes.length > B ? sha256(claveBytes) : claveBytes;
+  const k = new Uint8Array(B); k.set(clave);
+  const ipad = new Uint8Array(B + mensajeBytes.length);
+  const opad = new Uint8Array(B + 32);
+  for (let i = 0; i < B; i++) { ipad[i] = k[i] ^ 0x36; opad[i] = k[i] ^ 0x5c; }
+  ipad.set(mensajeBytes, B);
+  opad.set(sha256(ipad), B);
+  return sha256(opad);
+}
+
+/* ---------- base64url ---------- */
+const utf8 = s => new TextEncoder().encode(s);
+function b64url(bytes) {
+  let s = '';
+  bytes.forEach(b => { s += String.fromCharCode(b); });
+  return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+function deB64url(s) {
+  const base = s.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - s.length % 4) % 4);
+  const bin = atob(base);
+  return new Uint8Array(Array.from(bin, c => c.charCodeAt(0)));
+}
+const textoDe = bytes => new TextDecoder().decode(bytes);
+
+/* ---------- JWT ---------- */
+function firmar(cabecera, carga, secreto) {
+  const h = b64url(utf8(JSON.stringify(cabecera)));
+  const p = b64url(utf8(JSON.stringify(carga)));
+  const firma = b64url(hmac(utf8(secreto), utf8(h + '.' + p)));
+  return h + '.' + p + '.' + firma;
+}
+
+function cargaPorDefecto() {
+  const ahora = Math.floor(Date.now() / 1000);
+  return {
+    sub: 'usr_84213', nombre: 'Hamawt\'a', rol: 'vendedor',
+    permisos: ['pedidos:leer', 'pedidos:crear', 'clientes:leer'],
+    iss: 'code.pe', aud: 'api.distribuidora',
+    iat: ahora, nbf: ahora, exp: ahora + 3600, jti: 'b7c31f9e'
+  };
+}
+
+const SIGNIFICADOS = {
+  sub: 'Sujeto: a quién identifica el token',
+  nombre: 'Dato de perfil incluido por el emisor',
+  rol: 'Rol de la aplicación',
+  permisos: 'Permisos concedidos',
+  iss: 'Emisor del token',
+  aud: 'Audiencia: para qué servicio es válido',
+  iat: 'Momento de emisión',
+  nbf: 'No válido antes de',
+  exp: 'Expira en',
+  jti: 'Identificador único del token'
+};
+
+let tokenActual = '';
+
+function pintarToken(t) {
+  const [h, p, s] = t.split('.');
+  $('#token').innerHTML =
+    '<span class="c-acc">' + h + '</span><span class="c-mut">.</span>' +
+    '<span class="c-key">' + p + '</span><span class="c-mut">.</span>' +
+    '<span class="c-ok">' + s + '</span>' +
+    '\n\n<span class="c-mut">cabecera . carga útil . firma — ' + t.length + ' caracteres</span>';
+}
+
+function emitir(expirado) {
+  let cabecera, carga;
+  try { cabecera = JSON.parse($('#cabecera').value); } catch (e) { return error('La cabecera no es JSON válido.'); }
+  try { carga = JSON.parse($('#carga').value); } catch (e) { return error('La carga útil no es JSON válida.'); }
+  if (expirado) {
+    const ahora = Math.floor(Date.now() / 1000);
+    carga.exp = ahora - 600; carga.iat = ahora - 4200;
+    $('#carga').value = JSON.stringify(carga, null, 2);
+  }
+  tokenActual = firmar(cabecera, carga, $('#secreto').value);
+  pintarToken(tokenActual);
+  $('#entrada').value = tokenActual;
+  verificar();
+}
+
+function error(msg) {
+  $('#chips').textContent = '';
+  $('#chips').appendChild(el('span', { class: 'chip bad', text: msg }));
+  $('#claims').textContent = '';
+}
+
+function verificar() {
+  const t = $('#entrada').value.trim();
+  const chips = $('#chips'); chips.textContent = '';
+  const cuerpo = $('#claims'); cuerpo.textContent = '';
+  const partes = t.split('.');
+  if (partes.length !== 3) return error('El token debe tener tres partes separadas por punto.');
+
+  let cabecera, carga;
+  try {
+    cabecera = JSON.parse(textoDe(deB64url(partes[0])));
+    carga = JSON.parse(textoDe(deB64url(partes[1])));
+  } catch (e) { return error('No se pudo decodificar la cabecera o la carga.'); }
+
+  const esperada = b64url(hmac(utf8($('#secreto').value), utf8(partes[0] + '.' + partes[1])));
+  const firmaOk = esperada === partes[2];
+  const ahora = Math.floor(Date.now() / 1000);
+  const vigente = !carga.exp || carga.exp > ahora;
+  const yaVale = !carga.nbf || carga.nbf <= ahora;
+  const emisorOk = !$('#emisor').value || carga.iss === $('#emisor').value;
+
+  const marcar = (ok, texto) => chips.appendChild(el('span', { class: 'chip ' + (ok ? 'good' : 'bad'), text: texto }));
+  marcar(cabecera.alg === 'HS256', 'Algoritmo ' + (cabecera.alg || '—'));
+  marcar(firmaOk, firmaOk ? 'Firma válida' : 'Firma inválida');
+  marcar(vigente, vigente ? 'Vigente' : 'Expirado');
+  marcar(yaVale, yaVale ? 'Ya es válido' : 'Aún no es válido');
+  marcar(emisorOk, emisorOk ? 'Emisor correcto' : 'Emisor distinto al esperado');
+  chips.appendChild(el('span', {
+    class: 'chip ' + (firmaOk && vigente && yaVale && emisorOk ? 'good' : 'bad'),
+    text: firmaOk && vigente && yaVale && emisorOk ? 'ACEPTADO' : 'RECHAZADO'
+  }));
+
+  Object.entries(carga).forEach(([k, v]) => {
+    let valor = Array.isArray(v) ? v.join(', ') : String(v);
+    let nota = SIGNIFICADOS[k] || 'Claim propio de la aplicación';
+    if (['exp', 'iat', 'nbf'].includes(k)) {
+      const f = new Date(v * 1000);
+      valor = v + ' · ' + f.toLocaleString('es-PE');
+      if (k === 'exp') {
+        const min = (v - ahora) / 60;
+        nota = min > 0 ? 'Expira en ' + fmt(min, 1) + ' minutos' : 'Expiró hace ' + fmt(-min, 1) + ' minutos';
+      }
+    }
+    cuerpo.appendChild(el('tr', null, [
+      el('td', { text: k }),
+      el('td', { text: valor, style: 'white-space:normal;max-width:260px' }),
+      el('td', { text: nota, style: 'white-space:normal;color:var(--muted)' })
+    ]));
+  });
+}
+
+$('#firmar').addEventListener('click', () => emitir(false));
+$('#expirado').addEventListener('click', () => emitir(true));
+$('#verificar').addEventListener('click', verificar);
+$('#entrada').addEventListener('input', verificar);
+$('#secreto').addEventListener('input', verificar);
+$('#emisor').addEventListener('input', verificar);
+$('#manipular').addEventListener('click', () => {
+  const partes = $('#entrada').value.split('.');
+  if (partes.length !== 3) return;
+  try {
+    const carga = JSON.parse(textoDe(deB64url(partes[1])));
+    carga.rol = 'admin';
+    carga.permisos = ['*'];
+    $('#entrada').value = partes[0] + '.' + b64url(utf8(JSON.stringify(carga))) + '.' + partes[2];
+    verificar();
+  } catch (e) { error('No se pudo alterar el token.'); }
+});
+$('#restaurar').addEventListener('click', () => { $('#entrada').value = tokenActual; verificar(); });
+
+$('#carga').value = JSON.stringify(cargaPorDefecto(), null, 2);
+emitir(false);
+
+/* ---- exportación de resultados ---- */
+const X = CODE.exportar;
+X.registrar(() => {
+  const partes = $('#entrada').value.trim().split('.');
+  let carga = {};
+  try { carga = JSON.parse(textoDe(deB64url(partes[1]))); } catch (e) { /* token ilegible */ }
+  return {
+    titulo: 'Verificación de token JWT',
+    subtitulo: 'Algoritmo HS256 · firma y vigencia comprobadas en el navegador',
+    resumen: Array.from(document.querySelectorAll('#chips .chip')).map((c, i) => ({ k: 'Comprobación ' + (i + 1), v: c.textContent })),
+    tablas: [{
+      titulo: 'Claims del token',
+      columnas: ['Claim', 'Valor'],
+      filas: Object.entries(carga).map(([k, v]) => [k, Array.isArray(v) ? v.join(', ') : String(v)])
+    }],
+    nota: 'El token y el secreto son de demostración: no dan acceso a ningún servicio real.'
+  };
+});
+</script>
+</body>
+</html>

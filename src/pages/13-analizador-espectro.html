@@ -1,0 +1,265 @@
+<!--meta
+{
+  "id": "13",
+  "title": "SPECTRA · analizador y medidor de sonoridad",
+  "tagline": "Unidad de medición con FFT en escala logarítmica, espectrograma en cascada y sonoridad momentánea en LUFS con la ponderación K de la norma ITU-R BS.1770.",
+  "area": "audio",
+  "stack": ["Web Audio API", "Canvas", "ITU-R BS.1770"],
+  "libs": ["../assets/audio.js", "../assets/maquina.js"],
+  "estilos": ["../assets/maquina.css"],
+  "highlights": [
+    "Ponderación K implementada con los dos biquads de la norma, no con una curva inventada",
+    "Espectrograma dibujado desplazando el propio lienzo, sin acumular memoria",
+    "Detección del pico espectral con su nota musical más cercana"
+  ]
+}
+-->
+
+<div id="maquina"></div>
+
+<section class="panel">
+  <h2>Cómo se lee</h2>
+  <div class="cols">
+    <p class="note"><strong>LUFS</strong> mide sonoridad percibida, no amplitud: por eso dos temas con el mismo pico pueden sonar muy distinto.</p>
+    <p class="note"><strong>Referencias.</strong> Las plataformas de streaming trabajan cerca de −14 LUFS integrados; cine y radio, en torno a −23.</p>
+    <p class="note"><strong>Centroide</strong> es el «centro de gravedad» del espectro: sube cuando la mezcla se vuelve brillante.</p>
+    <p class="note"><strong>Micrófono.</strong> El navegador pedirá permiso; nada sale del equipo, todo el análisis ocurre en la página.</p>
+  </div>
+</section>
+
+<script>
+const { $, el, fmt } = CODE;
+const A = AUDIO, M = MAQUINA;
+
+let fuente = 'rosa', corriendo = false, bufferUsuario = null, flujoMic = null, frecTono = 1000;
+let src = null, an = null, anK = null, datosF = null, datosT = null, datosK = null;
+let historial = [], picoMax = -100;
+let pantalla, pantallaInfo, lienzoEsp, lienzoCascada, btnPlay, medNivel, botonesFuente = {};
+
+/* Ponderación K de la ITU-R BS.1770: realce de agudos + pasa altos. */
+function filtrosK(c) {
+  const shelf = c.createBiquadFilter();
+  shelf.type = 'highshelf'; shelf.frequency.value = 1500; shelf.gain.value = 4; shelf.Q.value = 0.7;
+  const hp = c.createBiquadFilter();
+  hp.type = 'highpass'; hp.frequency.value = 38; hp.Q.value = 0.5;
+  shelf.connect(hp);
+  return { entrada: shelf, salida: hp };
+}
+
+function cadena(c) {
+  an = c.createAnalyser(); an.fftSize = 8192; an.smoothingTimeConstant = 0.72;
+  anK = c.createAnalyser(); anK.fftSize = 4096;
+  datosF = new Float32Array(an.frequencyBinCount);
+  datosT = new Float32Array(an.fftSize);
+  datosK = new Float32Array(anK.fftSize);
+}
+
+async function nodoFuente(c) {
+  if (fuente === 'mic') {
+    flujoMic = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false } });
+    return c.createMediaStreamSource(flujoMic);
+  }
+  if (fuente === 'tono') {
+    const o = c.createOscillator();
+    o.type = 'sine';
+    o.frequency.value = frecTono;
+    const g = c.createGain(); g.gain.value = 0.2;
+    o.connect(g); o.start();
+    src = o;
+    return g;
+  }
+  const s = c.createBufferSource();
+  s.buffer = fuente === 'archivo' && bufferUsuario ? bufferUsuario
+    : fuente === 'loop' ? A.loopArmonico(c, 4) : A.pinkNoise(c, 4);
+  s.loop = true; s.start();
+  src = s;
+  return s;
+}
+
+async function iniciar() {
+  const c = await A.resume();
+  if (!an) cadena(c);
+  detenerFuente();
+  let nodo;
+  try { nodo = await nodoFuente(c); }
+  catch (e) { pantalla.escribir('<div class="grande">SIN MIC</div><div class="tenue">permiso denegado o no disponible</div>'); return; }
+  const k = filtrosK(c);
+  nodo.connect(an);
+  nodo.connect(k.entrada);
+  k.salida.connect(anK);
+  if (fuente !== 'mic') nodo.connect(c.destination);
+  corriendo = true;
+  picoMax = -100; historial = [];
+  btnPlay.encender(true);
+}
+
+function detenerFuente() {
+  if (src) { try { src.stop(); } catch (e) {} src = null; }
+  if (flujoMic) { flujoMic.getTracks().forEach(t => t.stop()); flujoMic = null; }
+}
+
+function detener() {
+  detenerFuente();
+  corriendo = false;
+  btnPlay.encender(false);
+}
+
+/* ================= interfaz ================= */
+
+function construir() {
+  const { maquina, panel } = M.chasis({
+    marca: 'CODE',
+    modelo: 'SPECTRA · analyzer & loudness meter',
+    derecha: [M.led('Signal', 'verde')],
+    pie: [el('span', { text: 'Ponderación K según ITU-R BS.1770 · análisis en el propio navegador' })]
+  });
+
+  pantalla = M.lcd(96);
+  pantallaInfo = M.lcd(108);
+  medNivel = M.medidor(20);
+
+  const transporte = el('div.fila-botones', null, [
+    (btnPlay = M.boton({ texto: '▶ Analizar', onClick: () => corriendo ? detener() : iniciar() })),
+    M.boton({ texto: '■ Stop', onClick: detener }),
+    M.botonArchivo({
+      texto: 'Abrir', pie: 'tu audio', id: 'archSpec',
+      onArchivo: async f => {
+        if (!f[0]) return;
+        const c = await A.resume();
+        bufferUsuario = await c.decodeAudioData(await f[0].arrayBuffer());
+        fuente = 'archivo'; marcarFuente(); iniciar();
+      }
+    })
+  ]);
+
+  const fuentes = el('div.fila-botones', { style: 'margin-top:10px' });
+  [['rosa', 'Ruido rosa'], ['loop', 'Loop'], ['tono', 'Tono'], ['mic', 'Micrófono']].forEach(([clave, texto]) => {
+    const b = M.boton({ texto, onClick: () => { fuente = clave; marcarFuente(); if (corriendo) iniciar(); } });
+    botonesFuente[clave] = b;
+    fuentes.appendChild(b);
+  });
+
+  const perillas = el('div.fila-perillas', null, [
+    M.perilla({
+      nombre: 'Tono', min: 20, max: 20000, valor: frecTono, log: true,
+      formato: v => v >= 1000 ? fmt(v / 1000, 2) + ' kHz' : fmt(v, 0) + ' Hz',
+      onCambio: v => { frecTono = v; if (corriendo && fuente === 'tono' && src && src.frequency) src.frequency.value = v; }
+    })
+  ]);
+
+  panel.appendChild(M.modulo('Fuente', [transporte, fuentes, el('div', { style: 'height:10px' }), perillas], 'sp5'));
+  panel.appendChild(M.modulo('Sonoridad', [pantalla, el('div', { style: 'height:10px' }), medNivel], 'sp4'));
+  panel.appendChild(M.modulo('Contenido espectral', pantallaInfo, 'sp3'));
+
+  lienzoEsp = el('canvas.pantalla', { height: 260, style: 'height:260px' });
+  lienzoCascada = el('canvas.pantalla', { height: 190, style: 'height:190px' });
+  panel.appendChild(M.modulo('Espectro instantáneo', lienzoEsp, 'sp7'));
+  panel.appendChild(M.modulo('Espectrograma', lienzoCascada, 'sp5'));
+
+  $('#maquina').appendChild(maquina);
+  marcarFuente();
+}
+
+function marcarFuente() {
+  Object.entries(botonesFuente).forEach(([clave, b]) => b.encender(clave === fuente));
+}
+
+/* ================= medición y dibujo ================= */
+
+const TEMA = { ink: '#e9e4d8', muted: 'rgba(125,240,168,.55)', line: 'rgba(125,240,168,.14)', surface2: '#0d1a12' };
+
+function pintar() {
+  const { g, w, h } = A.fit(lienzoEsp, 260);
+  const pad = 30, dbMin = -100, dbMax = 0;
+  A.rejilla(g, w, h, pad, dbMin, dbMax, TEMA);
+  const Y = db => 8 + (dbMax - db) / (dbMax - dbMin) * (h - 26);
+
+  if (corriendo && an) {
+    an.getFloatFrequencyData(datosF);
+    an.getFloatTimeDomainData(datosT);
+    anK.getFloatTimeDomainData(datosK);
+    const nyq = A.ctx().sampleRate / 2;
+
+    g.beginPath();
+    let empezado = false, iPico = 1, sumaP = 0, sumaPF = 0, eG = 0, eA = 0, eT = 0;
+    for (let i = 1; i < datosF.length; i++) {
+      const f = i * nyq / datosF.length;
+      const db = datosF[i];
+      const p = Math.pow(10, db / 10);
+      sumaP += p; sumaPF += p * f; eT += p;
+      if (f < 120) eG += p; else if (f > 6000) eA += p;
+      if (db > datosF[iPico]) iPico = i;
+      if (f < A.FMIN || f > A.FMAX) continue;
+      const x = A.fx(f, w, pad), y = Y(Math.max(dbMin, Math.min(dbMax, db)));
+      empezado ? g.lineTo(x, y) : (g.moveTo(x, y), empezado = true);
+    }
+    g.lineTo(w - pad, h - 18); g.lineTo(pad, h - 18); g.closePath();
+    g.fillStyle = 'rgba(231,185,61,.22)'; g.fill();
+    g.strokeStyle = '#e7b93d'; g.lineWidth = 1.6; g.stroke();
+
+    let pico = 0;
+    for (let i = 0; i < datosT.length; i++) pico = Math.max(pico, Math.abs(datosT[i]));
+    const dbPico = 20 * Math.log10(pico + 1e-9);
+    picoMax = Math.max(picoMax, dbPico);
+    medNivel.nivel(dbPico);
+
+    let ms = 0;
+    for (let i = 0; i < datosK.length; i++) ms += datosK[i] * datosK[i];
+    ms /= datosK.length;
+    const lufs = -0.691 + 10 * Math.log10(ms + 1e-12);
+    historial.push(lufs);
+    if (historial.length > 600) historial.shift();
+    const validos = historial.filter(v => v > -70).sort((a, b) => a - b);
+    const rango = validos.length > 20 ? validos[Math.floor(validos.length * 0.95)] - validos[Math.floor(validos.length * 0.1)] : 0;
+
+    pantalla.escribir(
+      '<div class="fila"><span class="grande">' + (lufs > -70 ? fmt(lufs, 1) : '−∞') + '</span>' +
+      '<span class="tenue">LUFS momentánea</span></div>' +
+      '<div class="fila"><span class="tenue">pico real</span><span>' + fmt(picoMax, 1) + ' dBFS</span></div>' +
+      '<div class="fila"><span class="tenue">rango</span><span>' + fmt(rango, 1) + ' LU</span></div>'
+    );
+
+    const fPico = iPico * nyq / datosF.length;
+    const midi = Math.round(69 + 12 * Math.log2(fPico / 440));
+    pantallaInfo.escribir(
+      '<div class="fila"><span class="tenue">pico espectral</span><span>' + fmt(fPico, 1) + ' Hz</span></div>' +
+      '<div class="fila"><span class="tenue">nota cercana</span><span>' + (fPico > 20 ? A.nombreNota(midi) : '—') + '</span></div>' +
+      '<div class="fila"><span class="tenue">centroide</span><span>' + fmt(sumaPF / (sumaP || 1), 0) + ' Hz</span></div>' +
+      '<div class="fila"><span class="tenue">bajo 120 Hz</span><span>' + fmt(eG / (eT || 1) * 100, 1) + ' %</span></div>' +
+      '<div class="fila"><span class="tenue">sobre 6 kHz</span><span>' + fmt(eA / (eT || 1) * 100, 1) + ' %</span></div>'
+    );
+
+    cascada(datosF, nyq);
+  } else {
+    medNivel.nivel(-60);
+  }
+  requestAnimationFrame(pintar);
+}
+
+let cascadaCtx = null, cascadaAncho = null;
+function cascada(datos, nyq) {
+  if (!cascadaCtx || cascadaAncho !== lienzoCascada.clientWidth) {
+    const r = A.fit(lienzoCascada, 190);
+    cascadaCtx = r.g;
+    cascadaAncho = lienzoCascada.clientWidth;
+    cascadaCtx.fillStyle = '#0d1a12';
+    cascadaCtx.fillRect(0, 0, r.w, r.h);
+    cascadaCtx._w = r.w; cascadaCtx._h = r.h;
+  }
+  const g = cascadaCtx, w = g._w, h = g._h;
+  g.drawImage(g.canvas, 0, 0, g.canvas.width, g.canvas.height, 0, 1, w, h);
+  for (let x = 0; x < w; x++) {
+    const f = A.FMIN * Math.pow(A.FMAX / A.FMIN, x / w);
+    const i = Math.round(f / nyq * datos.length);
+    const db = Math.max(-90, Math.min(0, datos[Math.min(i, datos.length - 1)] || -90));
+    const v = (db + 90) / 90;
+    g.fillStyle = `hsl(${150 - v * 110} ${45 + v * 45}% ${7 + v * 55}%)`;
+    g.fillRect(x, 0, 1, 1);
+  }
+}
+
+construir();
+pantalla.escribir('<div class="grande">—</div><div class="tenue">pulsa Analizar para empezar</div>');
+pantallaInfo.escribir('<div class="tenue">sin señal</div>');
+pintar();
+</script>

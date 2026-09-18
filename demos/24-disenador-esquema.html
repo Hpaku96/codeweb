@@ -1,0 +1,345 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Diseñador de esquema de base de datos · CODE</title>
+<meta name="description" content="Diagrama entidad-relación arrastrable que se traduce a SQL en tres dialectos, con claves primarias, foráneas, índices y restricciones generados a partir del modelo.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20100%20100%22%3E%3Ccircle%20cx%3D%2250%22%20cy%3D%2250%22%20r%3D%2241%22%20fill%3D%22none%22%20stroke%3D%22%2523E7B93D%22%20stroke-width%3D%228%22%2F%3E%3Cg%20fill%3D%22none%22%20stroke%3D%22%2523E7B93D%22%20stroke-width%3D%225%22%20stroke-linecap%3D%22round%22%3E%3Cpath%20d%3D%22M30%2026%20L52%2048%22%2F%3E%3Cpath%20d%3D%22M24%2034%20L40%2050%20L40%2058%22%2F%3E%3Cpath%20d%3D%22M20%2044%20L30%2054%20L30%2064%22%2F%3E%3C%2Fg%3E%3Cg%20fill%3D%22%2523E7B93D%22%3E%3Ccircle%20cx%3D%2252%22%20cy%3D%2248%22%20r%3D%225.5%22%2F%3E%3Ccircle%20cx%3D%2240%22%20cy%3D%2258%22%20r%3D%225.5%22%2F%3E%3Ccircle%20cx%3D%2230%22%20cy%3D%2264%22%20r%3D%225.5%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E">
+<script>(function(){try{var t=localStorage.getItem('code-theme');if(t!=='light'&&t!=='dark'){t=matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';}document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="../assets/demo.css">
+
+</head>
+<body>
+<div class="wrap">
+<header class="demo-head">
+  <a class="brand-bar" href="../index.html">
+    <svg viewBox="0 0 100 100" width="20" height="20" aria-hidden="true">
+      <circle cx="50" cy="50" r="41" fill="none" stroke="currentColor" stroke-width="7"/>
+      <g fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round">
+        <path d="M30 26 L52 48"/>
+        <path d="M24 34 L40 50 L40 58"/>
+        <path d="M20 44 L30 54 L30 64"/>
+      </g>
+      <g fill="currentColor">
+        <circle cx="52" cy="48" r="5"/>
+        <circle cx="40" cy="58" r="5"/>
+        <circle cx="30" cy="64" r="5"/>
+      </g>
+    </svg>
+    <span>CODE</span>
+  </a>
+  <span class="idx">24</span>
+  <h1>Diseñador de esquema de base de datos</h1>
+  <div class="head-actions">
+    <button type="button" class="theme-toggle" id="themeToggle" aria-pressed="false"></button>
+    <a class="back" href="../index.html">← Portafolio</a>
+  </div>
+  <p class="sub">Diagrama entidad-relación arrastrable que se traduce a SQL en tres dialectos, con claves primarias, foráneas, índices y restricciones generados a partir del modelo.</p>
+</header>
+<section class="panel" style="margin-bottom:16px">
+  <div class="row" style="justify-content:space-between">
+    <div class="row">
+      <div class="field" style="min-width:170px"><label for="dialecto">Dialecto SQL</label>
+        <select id="dialecto"><option value="postgres">PostgreSQL</option><option value="mysql">MySQL</option><option value="sqlite">SQLite</option></select>
+      </div>
+      <button class="sm" id="addTabla">+ Tabla</button>
+      <button class="sm" id="acomodar">Reacomodar diagrama</button>
+    </div>
+    <span class="chip" id="resumen">—</span>
+  </div>
+</section>
+
+<section class="panel" style="margin-bottom:16px">
+  <h2>Diagrama entidad-relación</h2>
+  <div id="lienzo" style="position:relative;height:460px;overflow:auto;background:var(--surface-2);border:1px solid var(--line-soft);border-radius:var(--r)">
+    <svg id="lineas" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none"></svg>
+  </div>
+  <p class="note" style="margin-top:12px">Arrastra las tablas para reordenar el diagrama. Los campos en <strong>negrita</strong> son clave primaria; los marcados con → son clave foránea.</p>
+</section>
+
+<div class="cols-2" style="grid-template-columns:minmax(0,1fr) minmax(0,1.2fr)">
+  <section class="panel">
+    <h2 id="tituloTabla">Editor de tabla</h2>
+    <div class="field"><label for="selTabla">Tabla</label><select id="selTabla"></select></div>
+    <div class="tablewrap" style="margin-top:12px">
+      <table><thead><tr><th>Campo</th><th>Tipo</th><th class="num">PK</th><th class="num">Nulo</th><th>Referencia</th><th></th></tr></thead><tbody id="campos"></tbody></table>
+    </div>
+    <div class="row" style="margin-top:12px">
+      <button class="sm" id="addCampo">+ Campo</button>
+      <button class="sm ghost" id="delTabla">Eliminar tabla</button>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>SQL generado</h2>
+    <div class="console" id="sql" style="max-height:520px"></div>
+  </section>
+</div>
+<footer class="demo-foot">
+  <span>CODE · Backend y datos · demo 24 de 30</span>
+  <span>JavaScript · SQL · SVG</span>
+</footer>
+</div>
+<script src="../assets/demo.js"></script>
+<script src="../assets/exportar.js"></script>
+
+<script>
+const { $, el } = CODE;
+
+const TIPOS = ['entero', 'serial', 'texto', 'texto largo', 'decimal', 'booleano', 'fecha', 'marca de tiempo'];
+const MAPA = {
+  postgres: { entero: 'INTEGER', serial: 'SERIAL PRIMARY KEY', texto: 'VARCHAR(120)', 'texto largo': 'TEXT', decimal: 'NUMERIC(12,2)', booleano: 'BOOLEAN', fecha: 'DATE', 'marca de tiempo': 'TIMESTAMPTZ' },
+  mysql: { entero: 'INT', serial: 'INT AUTO_INCREMENT PRIMARY KEY', texto: 'VARCHAR(120)', 'texto largo': 'TEXT', decimal: 'DECIMAL(12,2)', booleano: 'TINYINT(1)', fecha: 'DATE', 'marca de tiempo': 'DATETIME' },
+  sqlite: { entero: 'INTEGER', serial: 'INTEGER PRIMARY KEY AUTOINCREMENT', texto: 'TEXT', 'texto largo': 'TEXT', decimal: 'REAL', booleano: 'INTEGER', fecha: 'TEXT', 'marca de tiempo': 'TEXT' }
+};
+
+const esquema = [
+  { nombre: 'vendedores', x: 30, y: 30, campos: [
+    { n: 'id', t: 'serial', pk: true, nulo: false },
+    { n: 'nombre', t: 'texto', pk: false, nulo: false },
+    { n: 'zona', t: 'texto', pk: false, nulo: true },
+    { n: 'activo', t: 'booleano', pk: false, nulo: false }
+  ]},
+  { nombre: 'clientes', x: 300, y: 30, campos: [
+    { n: 'id', t: 'serial', pk: true, nulo: false },
+    { n: 'razon_social', t: 'texto', pk: false, nulo: false },
+    { n: 'tipo_negocio', t: 'texto', pk: false, nulo: true },
+    { n: 'distrito', t: 'texto', pk: false, nulo: true },
+    { n: 'vendedor_id', t: 'entero', pk: false, nulo: true, ref: 'vendedores.id' },
+    { n: 'creado_en', t: 'marca de tiempo', pk: false, nulo: false }
+  ]},
+  { nombre: 'productos', x: 30, y: 250, campos: [
+    { n: 'sku', t: 'texto', pk: true, nulo: false },
+    { n: 'nombre', t: 'texto', pk: false, nulo: false },
+    { n: 'marca', t: 'texto', pk: false, nulo: true },
+    { n: 'costo', t: 'decimal', pk: false, nulo: false },
+    { n: 'precio_lista', t: 'decimal', pk: false, nulo: false }
+  ]},
+  { nombre: 'pedidos', x: 600, y: 60, campos: [
+    { n: 'id', t: 'serial', pk: true, nulo: false },
+    { n: 'cliente_id', t: 'entero', pk: false, nulo: false, ref: 'clientes.id' },
+    { n: 'fecha', t: 'fecha', pk: false, nulo: false },
+    { n: 'estado', t: 'texto', pk: false, nulo: false },
+    { n: 'total', t: 'decimal', pk: false, nulo: false }
+  ]},
+  { nombre: 'pedido_items', x: 340, y: 280, campos: [
+    { n: 'id', t: 'serial', pk: true, nulo: false },
+    { n: 'pedido_id', t: 'entero', pk: false, nulo: false, ref: 'pedidos.id' },
+    { n: 'producto_sku', t: 'texto', pk: false, nulo: false, ref: 'productos.sku' },
+    { n: 'cantidad', t: 'decimal', pk: false, nulo: false },
+    { n: 'precio_unitario', t: 'decimal', pk: false, nulo: false }
+  ]}
+];
+
+let activa = 'clientes';
+
+function pintarDiagrama() {
+  const lienzo = $('#lienzo');
+  Array.from(lienzo.querySelectorAll('.tabla')).forEach(n => n.remove());
+  esquema.forEach(t => {
+    const caja = el('div.tabla', {
+      'data-t': t.nombre,
+      style: `position:absolute;left:${t.x}px;top:${t.y}px;width:216px;background:var(--surface);border:1px solid ${t.nombre === activa ? 'var(--accent)' : 'var(--line)'};border-radius:var(--r);box-shadow:var(--shadow);cursor:grab;user-select:none`
+    });
+    caja.appendChild(el('div', {
+      text: t.nombre,
+      style: 'padding:7px 10px;font:600 12px var(--mono);letter-spacing:.04em;background:var(--surface-2);border-bottom:1px solid var(--line);border-radius:var(--r) var(--r) 0 0'
+    }));
+    t.campos.forEach(c => caja.appendChild(el('div', {
+      'data-campo': t.nombre + '.' + c.n,
+      style: 'padding:4px 10px;font:' + (c.pk ? '600' : '400') + ' 11.5px var(--mono);display:flex;justify-content:space-between;gap:8px'
+    }, [
+      el('span', { text: (c.ref ? '→ ' : '') + c.n }),
+      el('span', { text: c.t, style: 'color:var(--muted)' })
+    ])));
+    caja.addEventListener('pointerdown', e => arrastrar(e, t, caja));
+    caja.addEventListener('click', () => { activa = t.nombre; $('#selTabla').value = t.nombre; render(); });
+    lienzo.appendChild(caja);
+  });
+  dibujarLineas();
+}
+
+function arrastrar(e, t, caja) {
+  if (e.target.closest('input, select, button')) return;
+  const x0 = e.clientX, y0 = e.clientY, tx = t.x, ty = t.y;
+  caja.setPointerCapture(e.pointerId);
+  const mover = ev => {
+    t.x = Math.max(0, tx + ev.clientX - x0);
+    t.y = Math.max(0, ty + ev.clientY - y0);
+    caja.style.left = t.x + 'px'; caja.style.top = t.y + 'px';
+    dibujarLineas();
+  };
+  const soltar = () => {
+    caja.removeEventListener('pointermove', mover);
+    caja.removeEventListener('pointerup', soltar);
+  };
+  caja.addEventListener('pointermove', mover);
+  caja.addEventListener('pointerup', soltar);
+}
+
+function dibujarLineas() {
+  const svg = $('#lineas');
+  svg.textContent = '';
+  const base = $('#lienzo').getBoundingClientRect();
+  const ns = 'http://www.w3.org/2000/svg';
+  const acc = getComputedStyle(document.documentElement).getPropertyValue('--blue').trim();
+
+  esquema.forEach(t => t.campos.filter(c => c.ref).forEach(c => {
+    const origen = document.querySelector('[data-campo="' + t.nombre + '.' + c.n + '"]');
+    const destino = document.querySelector('[data-campo="' + c.ref + '"]');
+    if (!origen || !destino) return;
+    const a = origen.getBoundingClientRect(), b = destino.getBoundingClientRect();
+    const sc = $('#lienzo');
+    const ax = a.left - base.left + sc.scrollLeft + (a.left < b.left ? a.width : 0);
+    const ay = a.top - base.top + sc.scrollTop + a.height / 2;
+    const bx = b.left - base.left + sc.scrollLeft + (a.left < b.left ? 0 : b.width);
+    const by = b.top - base.top + sc.scrollTop + b.height / 2;
+    const p = document.createElementNS(ns, 'path');
+    const mx = (ax + bx) / 2;
+    p.setAttribute('d', `M${ax} ${ay} C${mx} ${ay} ${mx} ${by} ${bx} ${by}`);
+    p.setAttribute('fill', 'none');
+    p.setAttribute('stroke', acc);
+    p.setAttribute('stroke-width', '1.6');
+    svg.appendChild(p);
+    const punto = document.createElementNS(ns, 'circle');
+    punto.setAttribute('cx', bx); punto.setAttribute('cy', by);
+    punto.setAttribute('r', '3.5'); punto.setAttribute('fill', acc);
+    svg.appendChild(punto);
+  }));
+}
+
+function pintarEditor() {
+  const t = esquema.find(x => x.nombre === activa);
+  $('#tituloTabla').textContent = 'Editor · ' + (t ? t.nombre : '—');
+  const tb = $('#campos'); tb.textContent = '';
+  if (!t) return;
+  t.campos.forEach((c, i) => {
+    const nombre = el('input', { type: 'text', value: c.n, 'aria-label': 'nombre del campo' });
+    nombre.addEventListener('input', () => { c.n = nombre.value.replace(/\s+/g, '_').toLowerCase(); render(); });
+    const tipo = el('select', { 'aria-label': 'tipo' });
+    TIPOS.forEach(x => tipo.appendChild(el('option', { value: x, text: x, selected: x === c.t })));
+    tipo.addEventListener('input', () => { c.t = tipo.value; render(); });
+    const pk = el('input', { type: 'checkbox', 'aria-label': 'clave primaria' }); pk.checked = c.pk;
+    pk.addEventListener('change', () => { c.pk = pk.checked; render(); });
+    const nulo = el('input', { type: 'checkbox', 'aria-label': 'admite nulo' }); nulo.checked = c.nulo;
+    nulo.addEventListener('change', () => { c.nulo = nulo.checked; render(); });
+    const ref = el('select', { 'aria-label': 'referencia' });
+    ref.appendChild(el('option', { value: '', text: '—' }));
+    esquema.filter(o => o.nombre !== t.nombre).forEach(o => o.campos.filter(f => f.pk).forEach(f => {
+      const v = o.nombre + '.' + f.n;
+      ref.appendChild(el('option', { value: v, text: v, selected: c.ref === v }));
+    }));
+    ref.addEventListener('input', () => { c.ref = ref.value || undefined; render(); });
+
+    tb.appendChild(el('tr', null, [
+      el('td', null, nombre), el('td', null, tipo),
+      el('td.num', null, pk), el('td.num', null, nulo), el('td', null, ref),
+      el('td', null, el('button.sm.ghost', { text: '✕', onclick: () => { t.campos.splice(i, 1); render(); } }))
+    ]));
+  });
+}
+
+function generarSQL() {
+  const d = $('#dialecto').value, m = MAPA[d];
+  const cita = n => d === 'mysql' ? '`' + n + '`' : '"' + n + '"';
+  const partes = [];
+  partes.push('-- Esquema generado por CODE · dialecto ' + d);
+  partes.push('-- ' + new Date().toISOString().slice(0, 10) + '\n');
+
+  esquema.forEach(t => {
+    const lineas = t.campos.map(c => {
+      let def = '  ' + cita(c.n) + ' ' + m[c.t];
+      if (c.t !== 'serial') {
+        if (c.pk) def += ' PRIMARY KEY';
+        if (!c.nulo && !c.pk) def += ' NOT NULL';
+      }
+      return def;
+    });
+    t.campos.filter(c => c.ref).forEach(c => {
+      const [tabla, campo] = c.ref.split('.');
+      lineas.push('  CONSTRAINT ' + cita('fk_' + t.nombre + '_' + tabla) +
+        ' FOREIGN KEY (' + cita(c.n) + ') REFERENCES ' + cita(tabla) + ' (' + cita(campo) + ') ON DELETE RESTRICT');
+    });
+    partes.push('CREATE TABLE ' + cita(t.nombre) + ' (\n' + lineas.join(',\n') + '\n);');
+  });
+
+  esquema.forEach(t => t.campos.filter(c => c.ref).forEach(c => {
+    partes.push('CREATE INDEX ' + cita('idx_' + t.nombre + '_' + c.n) + ' ON ' + cita(t.nombre) + ' (' + cita(c.n) + ');');
+  }));
+
+  return partes.join('\n\n');
+}
+
+function pintarSQL() {
+  const texto = generarSQL()
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/^(--.*)$/gm, '<span class="c-mut">$1</span>')
+    .replace(/\b(CREATE TABLE|CREATE INDEX|PRIMARY KEY|FOREIGN KEY|REFERENCES|NOT NULL|CONSTRAINT|ON DELETE RESTRICT|ON)\b/g, '<span class="c-acc">$1</span>')
+    .replace(/\b(INTEGER|SERIAL|VARCHAR\(120\)|TEXT|NUMERIC\(12,2\)|DECIMAL\(12,2\)|BOOLEAN|TINYINT\(1\)|DATE|TIMESTAMPTZ|DATETIME|REAL|INT|AUTO_INCREMENT|AUTOINCREMENT)\b/g, '<span class="c-key">$1</span>');
+  $('#sql').innerHTML = texto;
+}
+
+function pintarSelector() {
+  const sel = $('#selTabla');
+  sel.textContent = '';
+  esquema.forEach(t => sel.appendChild(el('option', { value: t.nombre, text: t.nombre, selected: t.nombre === activa })));
+  const campos = esquema.reduce((s, t) => s + t.campos.length, 0);
+  const fks = esquema.reduce((s, t) => s + t.campos.filter(c => c.ref).length, 0);
+  $('#resumen').textContent = esquema.length + ' tablas · ' + campos + ' campos · ' + fks + ' claves foráneas';
+}
+
+function render() { pintarSelector(); pintarDiagrama(); pintarEditor(); pintarSQL(); }
+
+$('#selTabla').addEventListener('input', e => { activa = e.target.value; render(); });
+$('#dialecto').addEventListener('input', pintarSQL);
+$('#addCampo').addEventListener('click', () => {
+  const t = esquema.find(x => x.nombre === activa);
+  if (t) { t.campos.push({ n: 'campo_' + (t.campos.length + 1), t: 'texto', pk: false, nulo: true }); render(); }
+});
+$('#addTabla').addEventListener('click', () => {
+  const nombre = 'tabla_' + (esquema.length + 1);
+  esquema.push({ nombre, x: 60 + esquema.length * 18, y: 380, campos: [{ n: 'id', t: 'serial', pk: true, nulo: false }] });
+  activa = nombre; render();
+});
+$('#delTabla').addEventListener('click', () => {
+  const i = esquema.findIndex(x => x.nombre === activa);
+  if (i >= 0 && esquema.length > 1) {
+    const borrada = esquema[i].nombre;
+    esquema.splice(i, 1);
+    esquema.forEach(t => t.campos.forEach(c => { if (c.ref && c.ref.startsWith(borrada + '.')) delete c.ref; }));
+    activa = esquema[0].nombre;
+    render();
+  }
+});
+$('#acomodar').addEventListener('click', () => {
+  esquema.forEach((t, i) => { t.x = 30 + (i % 3) * 250; t.y = 30 + Math.floor(i / 3) * 210; });
+  render();
+});
+
+render();
+
+/* ---- exportación de resultados ---- */
+const X = CODE.exportar;
+X.registrar(() => ({
+  titulo: 'Esquema de base de datos',
+  subtitulo: $('#resumen').textContent + ' · dialecto ' + $('#dialecto').selectedOptions[0].textContent,
+  resumen: [
+    { k: 'Tablas', v: esquema.length },
+    { k: 'Campos', v: esquema.reduce((s, t) => s + t.campos.length, 0) },
+    { k: 'Claves foráneas', v: esquema.reduce((s, t) => s + t.campos.filter(c => c.ref).length, 0) }
+  ],
+  tablas: [{
+    titulo: 'Diccionario de datos',
+    columnas: ['Tabla', 'Campo', 'Tipo', 'Clave primaria', 'Admite nulo', 'Referencia'],
+    filas: esquema.flatMap(t => t.campos.map(c =>
+      [t.nombre, c.n, c.t, c.pk ? 'sí' : '', c.nulo ? 'sí' : '', c.ref || '']))
+  }],
+  nota: 'El SQL completo se genera en la propia herramienta; aquí va el diccionario del modelo.'
+}));
+</script>
+</body>
+</html>

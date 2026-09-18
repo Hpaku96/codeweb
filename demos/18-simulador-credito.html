@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Simulador de crédito y cronograma · CODE</title>
+<meta name="description" content="Cuota francesa o alemana, conversión de tasa efectiva anual a mensual, cronograma completo y costo total anual calculado por tasa interna de retorno sobre el flujo real.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20100%20100%22%3E%3Ccircle%20cx%3D%2250%22%20cy%3D%2250%22%20r%3D%2241%22%20fill%3D%22none%22%20stroke%3D%22%2523E7B93D%22%20stroke-width%3D%228%22%2F%3E%3Cg%20fill%3D%22none%22%20stroke%3D%22%2523E7B93D%22%20stroke-width%3D%225%22%20stroke-linecap%3D%22round%22%3E%3Cpath%20d%3D%22M30%2026%20L52%2048%22%2F%3E%3Cpath%20d%3D%22M24%2034%20L40%2050%20L40%2058%22%2F%3E%3Cpath%20d%3D%22M20%2044%20L30%2054%20L30%2064%22%2F%3E%3C%2Fg%3E%3Cg%20fill%3D%22%2523E7B93D%22%3E%3Ccircle%20cx%3D%2252%22%20cy%3D%2248%22%20r%3D%225.5%22%2F%3E%3Ccircle%20cx%3D%2240%22%20cy%3D%2258%22%20r%3D%225.5%22%2F%3E%3Ccircle%20cx%3D%2230%22%20cy%3D%2264%22%20r%3D%225.5%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E">
+<script>(function(){try{var t=localStorage.getItem('code-theme');if(t!=='light'&&t!=='dark'){t=matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';}document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="../assets/demo.css">
+
+</head>
+<body>
+<div class="wrap">
+<header class="demo-head">
+  <a class="brand-bar" href="../index.html">
+    <svg viewBox="0 0 100 100" width="20" height="20" aria-hidden="true">
+      <circle cx="50" cy="50" r="41" fill="none" stroke="currentColor" stroke-width="7"/>
+      <g fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round">
+        <path d="M30 26 L52 48"/>
+        <path d="M24 34 L40 50 L40 58"/>
+        <path d="M20 44 L30 54 L30 64"/>
+      </g>
+      <g fill="currentColor">
+        <circle cx="52" cy="48" r="5"/>
+        <circle cx="40" cy="58" r="5"/>
+        <circle cx="30" cy="64" r="5"/>
+      </g>
+    </svg>
+    <span>CODE</span>
+  </a>
+  <span class="idx">18</span>
+  <h1>Simulador de crédito y cronograma</h1>
+  <div class="head-actions">
+    <button type="button" class="theme-toggle" id="themeToggle" aria-pressed="false"></button>
+    <a class="back" href="../index.html">← Portafolio</a>
+  </div>
+  <p class="sub">Cuota francesa o alemana, conversión de tasa efectiva anual a mensual, cronograma completo y costo total anual calculado por tasa interna de retorno sobre el flujo real.</p>
+</header>
+<div class="cols-2" style="grid-template-columns:minmax(0,1fr) minmax(0,1.35fr)">
+  <div class="stack">
+    <section class="panel">
+      <h2>Condiciones del crédito</h2>
+      <fieldset>
+        <div class="field"><label for="monto">Monto financiado (S/)</label><input type="number" id="monto" value="24000" step="500" min="100"></div>
+        <div class="field"><label for="tea">Tasa efectiva anual (%)</label><input type="number" id="tea" value="34.5" step="0.1" min="0"></div>
+        <div class="field"><label for="n">Plazo (meses)</label><input type="number" id="n" value="24" step="1" min="1" max="120"></div>
+        <div class="field">
+          <label for="sistema">Sistema de amortización</label>
+          <select id="sistema"><option value="frances">Francés — cuota constante</option><option value="aleman">Alemán — amortización constante</option></select>
+        </div>
+        <div class="cols" style="gap:12px">
+          <div class="field"><label for="seguro">Desgravamen mensual (%)</label><input type="number" id="seguro" value="0.045" step="0.005" min="0"></div>
+          <div class="field"><label for="portes">Portes mensuales (S/)</label><input type="number" id="portes" value="9" step="1" min="0"></div>
+        </div>
+      </fieldset>
+    </section>
+
+    <section class="panel">
+      <h2>Resumen</h2>
+      <div class="cols" style="gap:10px">
+        <div class="readout hi"><span class="k">Primera cuota</span><span class="v" id="cuota">—</span></div>
+        <div class="readout"><span class="k">TCEA</span><span class="v" id="tcea">—</span></div>
+      </div>
+      <dl class="kv" style="margin-top:16px">
+        <dt>Tasa efectiva mensual</dt><dd id="tem">—</dd>
+        <dt>Total de intereses</dt><dd id="totInt">—</dd>
+        <dt>Total de seguros y portes</dt><dd id="totSeg">—</dd>
+        <dt>Total a pagar</dt><dd id="totPag">—</dd>
+        <dt>Sobrecosto sobre el monto</dt><dd id="sobre">—</dd>
+      </dl>
+      <p class="note" style="margin-top:14px">Herramienta de cálculo con fines de demostración. No sustituye la hoja resumen que debe entregar la entidad financiera.</p>
+    </section>
+  </div>
+
+  <div class="stack">
+    <section class="panel"><h2>Composición de la cuota</h2><div id="graf"></div></section>
+    <section class="panel">
+      <h2>Cronograma de pagos</h2>
+      <div class="tablewrap" style="max-height:420px;overflow-y:auto">
+        <table><thead><tr><th class="num">N°</th><th class="num">Saldo inicial</th><th class="num">Interés</th><th class="num">Amortización</th><th class="num">Seguro+portes</th><th class="num">Cuota</th><th class="num">Saldo final</th></tr></thead><tbody id="crono"></tbody></table>
+      </div>
+    </section>
+  </div>
+</div>
+<footer class="demo-foot">
+  <span>CODE · Negocio y comercio · demo 18 de 30</span>
+  <span>JavaScript · Matemática financiera · SVG</span>
+</footer>
+</div>
+<script src="../assets/demo.js"></script>
+<script src="../assets/exportar.js"></script>
+
+<script>
+const { $, el, num, fmt, soles, token, draw, svgEl, onThemeChange } = CODE;
+
+function cronograma() {
+  const P = num($('#monto').value, 0);
+  const tea = num($('#tea').value, 0) / 100;
+  const n = Math.max(1, Math.round(num($('#n').value, 12)));
+  const tem = Math.pow(1 + tea, 1 / 12) - 1;
+  const seg = num($('#seguro').value, 0) / 100;
+  const portes = num($('#portes').value, 0);
+  const frances = $('#sistema').value === 'frances';
+
+  const cuotaBase = frances && tem > 0
+    ? P * tem / (1 - Math.pow(1 + tem, -n))
+    : frances ? P / n : 0;
+
+  const filas = [];
+  let saldo = P;
+  for (let k = 1; k <= n; k++) {
+    const interes = saldo * tem;
+    const amort = frances ? Math.min(saldo, cuotaBase - interes) : P / n;
+    const cargo = saldo * seg + portes;
+    const cuota = interes + amort + cargo;
+    const fin = Math.max(0, saldo - amort);
+    filas.push({ k, ini: saldo, interes, amort, cargo, cuota, fin });
+    saldo = fin;
+  }
+  return { filas, tem, P, n };
+}
+
+/* TCEA: tasa mensual que anula el valor presente del flujo, anualizada. */
+function tcea(filas, P) {
+  const f = i => filas.reduce((s, r, k) => s + r.cuota / Math.pow(1 + i, k + 1), 0) - P;
+  let lo = 1e-6, hi = 1.5;
+  if (f(lo) < 0) return NaN;
+  for (let it = 0; it < 200; it++) {
+    const mid = (lo + hi) / 2;
+    (f(mid) > 0 ? lo = mid : hi = mid);
+  }
+  const i = (lo + hi) / 2;
+  return Math.pow(1 + i, 12) - 1;
+}
+
+function render() {
+  const { filas, tem, P } = cronograma();
+  const totInt = filas.reduce((s, r) => s + r.interes, 0);
+  const totSeg = filas.reduce((s, r) => s + r.cargo, 0);
+  const totPag = filas.reduce((s, r) => s + r.cuota, 0);
+
+  $('#cuota').textContent = soles(filas[0].cuota);
+  $('#tem').textContent = fmt(tem * 100, 3) + ' %';
+  $('#totInt').textContent = soles(totInt);
+  $('#totSeg').textContent = soles(totSeg);
+  $('#totPag').textContent = soles(totPag);
+  $('#sobre').textContent = fmt((totPag / P - 1) * 100, 1) + ' %';
+  const t = tcea(filas, P);
+  $('#tcea').textContent = Number.isFinite(t) ? fmt(t * 100, 2) + ' %' : '—';
+
+  const tb = $('#crono'); tb.textContent = '';
+  filas.forEach(r => tb.appendChild(el('tr', null, [
+    el('td.num', { text: r.k }),
+    el('td.num', { text: fmt(r.ini, 2) }),
+    el('td.num', { text: fmt(r.interes, 2) }),
+    el('td.num', { text: fmt(r.amort, 2) }),
+    el('td.num', { text: fmt(r.cargo, 2) }),
+    el('td.num', { text: fmt(r.cuota, 2) }),
+    el('td.num', { text: fmt(r.fin, 2) })
+  ])));
+
+  dibujar(filas);
+}
+
+function dibujar(filas) {
+  const w = 620, h = 300, pad = { l: 56, r: 12, t: 12, b: 32 };
+  const iw = w - pad.l - pad.r, ih = h - pad.t - pad.b;
+  const max = Math.max(...filas.map(r => r.cuota));
+  const bw = iw / filas.length;
+  const svg = svgEl('svg', { class: 'chart', viewBox: `0 0 ${w} ${h}`, role: 'img' });
+  const acc = token('accent'), blue = token('blue'), mut = token('muted');
+
+  for (let i = 0; i <= 4; i++) {
+    const y = pad.t + ih - ih * i / 4;
+    svg.appendChild(svgEl('line', { class: 'gridline', x1: pad.l, x2: w - pad.r, y1: y, y2: y }));
+    const t = svgEl('text', { x: pad.l - 7, y: y + 3.5, 'text-anchor': 'end' });
+    t.textContent = fmt(max * i / 4, 0);
+    svg.appendChild(t);
+  }
+
+  filas.forEach((r, i) => {
+    const x = pad.l + i * bw + bw * 0.14, ancho = bw * 0.72;
+    const hInt = r.interes / max * ih, hAmo = r.amort / max * ih, hCar = r.cargo / max * ih;
+    let y = pad.t + ih;
+    [[hAmo, blue], [hInt, acc], [hCar, mut]].forEach(([alto, color]) => {
+      y -= alto;
+      svg.appendChild(svgEl('rect', { x, y, width: ancho, height: Math.max(0, alto), fill: color }));
+    });
+    if (filas.length <= 36 && (i % Math.ceil(filas.length / 12) === 0)) {
+      const t = svgEl('text', { x: x + ancho / 2, y: pad.t + ih + 14, 'text-anchor': 'middle' });
+      t.textContent = r.k;
+      svg.appendChild(t);
+    }
+  });
+
+  [['Amortización', blue], ['Interés', acc], ['Seguro y portes', mut]].forEach(([nombre, color], i) => {
+    svg.appendChild(svgEl('rect', { x: pad.l + i * 130, y: 2, width: 9, height: 9, fill: color, rx: 2 }));
+    const t = svgEl('text', { x: pad.l + i * 130 + 14, y: 10 });
+    t.textContent = nombre;
+    svg.appendChild(t);
+  });
+  draw($('#graf'), svg);
+}
+
+['#monto', '#tea', '#n', '#sistema', '#seguro', '#portes'].forEach(s => $(s).addEventListener('input', render));
+onThemeChange(render);
+render();
+
+/* ---- exportación de resultados ---- */
+const X = CODE.exportar;
+X.registrar(() => ({
+  titulo: 'Simulación de crédito',
+  subtitulo: soles(num($('#monto').value, 0)) + ' a ' + $('#n').value + ' meses · ' +
+    $('#sistema').selectedOptions[0].textContent,
+  resumen: X.desdeReadouts().concat(X.desdeKv('.kv')),
+  tablas: [{
+    titulo: 'Cronograma de pagos',
+    columnas: ['N°', 'Saldo inicial', 'Interés', 'Amortización', 'Seguro y portes', 'Cuota', 'Saldo final'],
+    filas: cronograma().filas.map(r => [r.k, fmt(r.ini, 2), fmt(r.interes, 2), fmt(r.amort, 2), fmt(r.cargo, 2), fmt(r.cuota, 2), fmt(r.fin, 2)])
+  }],
+  nota: 'Herramienta de cálculo con fines de demostración; no sustituye la hoja resumen de la entidad financiera.'
+}));
+</script>
+</body>
+</html>

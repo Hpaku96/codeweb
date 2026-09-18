@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Catálogo de precios y cotizador · CODE</title>
+<meta name="description" content="Catálogo filtrable de 24 productos con precio por escala de volumen, carrito de cotización, descuento por monto, IGV y documento listo para imprimir o enviar.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20100%20100%22%3E%3Ccircle%20cx%3D%2250%22%20cy%3D%2250%22%20r%3D%2241%22%20fill%3D%22none%22%20stroke%3D%22%2523E7B93D%22%20stroke-width%3D%228%22%2F%3E%3Cg%20fill%3D%22none%22%20stroke%3D%22%2523E7B93D%22%20stroke-width%3D%225%22%20stroke-linecap%3D%22round%22%3E%3Cpath%20d%3D%22M30%2026%20L52%2048%22%2F%3E%3Cpath%20d%3D%22M24%2034%20L40%2050%20L40%2058%22%2F%3E%3Cpath%20d%3D%22M20%2044%20L30%2054%20L30%2064%22%2F%3E%3C%2Fg%3E%3Cg%20fill%3D%22%2523E7B93D%22%3E%3Ccircle%20cx%3D%2252%22%20cy%3D%2248%22%20r%3D%225.5%22%2F%3E%3Ccircle%20cx%3D%2240%22%20cy%3D%2258%22%20r%3D%225.5%22%2F%3E%3Ccircle%20cx%3D%2230%22%20cy%3D%2264%22%20r%3D%225.5%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E">
+<script>(function(){try{var t=localStorage.getItem('code-theme');if(t!=='light'&&t!=='dark'){t=matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';}document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="../assets/demo.css">
+
+</head>
+<body>
+<div class="wrap">
+<header class="demo-head">
+  <a class="brand-bar" href="../index.html">
+    <svg viewBox="0 0 100 100" width="20" height="20" aria-hidden="true">
+      <circle cx="50" cy="50" r="41" fill="none" stroke="currentColor" stroke-width="7"/>
+      <g fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round">
+        <path d="M30 26 L52 48"/>
+        <path d="M24 34 L40 50 L40 58"/>
+        <path d="M20 44 L30 54 L30 64"/>
+      </g>
+      <g fill="currentColor">
+        <circle cx="52" cy="48" r="5"/>
+        <circle cx="40" cy="58" r="5"/>
+        <circle cx="30" cy="64" r="5"/>
+      </g>
+    </svg>
+    <span>CODE</span>
+  </a>
+  <span class="idx">15</span>
+  <h1>Catálogo de precios y cotizador</h1>
+  <div class="head-actions">
+    <button type="button" class="theme-toggle" id="themeToggle" aria-pressed="false"></button>
+    <a class="back" href="../index.html">← Portafolio</a>
+  </div>
+  <p class="sub">Catálogo filtrable de 24 productos con precio por escala de volumen, carrito de cotización, descuento por monto, IGV y documento listo para imprimir o enviar.</p>
+</header>
+<section class="panel" style="margin-bottom:16px">
+  <div class="row" style="gap:12px">
+    <div class="field" style="flex:1 1 220px">
+      <label for="q">Buscar</label>
+      <input type="search" id="q" placeholder="hot dog, queso, Cerdeña…">
+    </div>
+    <div class="field" style="min-width:150px"><label for="linea">Línea</label><select id="linea"></select></div>
+    <div class="field" style="min-width:150px"><label for="marca">Marca</label><select id="marca"></select></div>
+    <div class="field" style="min-width:160px"><label for="orden">Ordenar por</label>
+      <select id="orden">
+        <option value="nombre">Nombre</option>
+        <option value="precio">Precio menor</option>
+        <option value="precio-desc">Precio mayor</option>
+        <option value="rotacion">Más vendidos</option>
+      </select>
+    </div>
+  </div>
+</section>
+
+<div class="cols-2" style="grid-template-columns:minmax(0,1.6fr) minmax(0,1fr)">
+  <section class="panel">
+    <h2><span id="conteo">—</span></h2>
+    <div class="tablewrap" style="max-height:620px;overflow-y:auto">
+      <table>
+        <thead><tr><th>Producto</th><th>Presentación</th><th class="num">Lista</th><th class="num">Mayorista</th><th class="num">Cant.</th><th></th></tr></thead>
+        <tbody id="catalogo"></tbody>
+      </table>
+    </div>
+    <p class="note" style="margin-top:12px">Escalas: <strong>1 – 9</strong> precio de lista · <strong>10 – 49</strong> precio mayorista · <strong>50 a más</strong> mayorista con 4 % adicional.</p>
+  </section>
+
+  <section class="panel">
+    <h2>Cotización</h2>
+    <div class="field"><label for="cliente">Cliente</label><select id="cliente"></select></div>
+    <div class="tablewrap" style="margin-top:12px">
+      <table><thead><tr><th>Ítem</th><th class="num">Cant.</th><th class="num">P. unit.</th><th class="num">Importe</th><th></th></tr></thead><tbody id="carrito"></tbody></table>
+    </div>
+    <dl class="kv" style="margin-top:14px">
+      <dt>Valor de venta</dt><dd id="sub">—</dd>
+      <dt>Descuento por monto <span id="descPct" class="chip">—</span></dt><dd id="desc">—</dd>
+      <dt>IGV 18 %</dt><dd id="igv">—</dd>
+    </dl>
+    <div class="readout hi" style="margin-top:12px"><span class="k">Total de la cotización</span><span class="v" id="total">—</span></div>
+    <div class="row" style="margin-top:14px">
+      <button class="primary" id="imprimir">Generar documento</button>
+      <button class="sm" id="vaciar">Vaciar</button>
+    </div>
+  </section>
+</div>
+
+<section class="panel" id="doc" hidden style="margin-top:16px">
+  <h2>Documento de cotización</h2>
+  <div id="docBody"></div>
+</section>
+<footer class="demo-foot">
+  <span>CODE · Negocio y comercio · demo 15 de 30</span>
+  <span>JavaScript · Estado en memoria · Impresión</span>
+</footer>
+</div>
+<script src="../assets/demo.js"></script>
+<script src="../assets/exportar.js"></script>
+<script src="../assets/datos-comercial.js"></script>
+<script>
+const { $, el, num, fmt, soles } = CODE;
+const { PRODUCTOS, CLIENTES } = DATOS;
+
+const carrito = new Map();
+
+function precioPorCantidad(p, cant) {
+  if (cant >= 50) return p.mayorista * 0.96;
+  if (cant >= 10) return p.mayorista;
+  return p.lista;
+}
+
+function opciones(sel, valores, etiquetaTodos) {
+  sel.appendChild(el('option', { value: '', text: etiquetaTodos }));
+  valores.forEach(v => sel.appendChild(el('option', { value: v, text: v })));
+}
+
+function filtrados() {
+  const q = $('#q').value.trim().toLowerCase();
+  const linea = $('#linea').value, marca = $('#marca').value;
+  let lista = PRODUCTOS.filter(p =>
+    (!linea || p.linea === linea) && (!marca || p.marca === marca) &&
+    (!q || (p.nombre + ' ' + p.marca + ' ' + p.sku + ' ' + p.linea).toLowerCase().includes(q))
+  );
+  const orden = $('#orden').value;
+  lista = lista.slice().sort((a, b) =>
+    orden === 'precio' ? a.lista - b.lista :
+    orden === 'precio-desc' ? b.lista - a.lista :
+    orden === 'rotacion' ? b.rotacion - a.rotacion :
+    a.nombre.localeCompare(b.nombre));
+  return lista;
+}
+
+function pintarCatalogo() {
+  const lista = filtrados();
+  $('#conteo').textContent = lista.length + ' producto' + (lista.length === 1 ? '' : 's') + ' en catálogo';
+  const tb = $('#catalogo'); tb.textContent = '';
+  lista.forEach(p => {
+    const cant = el('input', { type: 'number', value: carrito.get(p.sku) || 0, min: '0', step: '1', 'aria-label': 'cantidad ' + p.nombre });
+    const agregar = () => {
+      const c = Math.max(0, Math.round(num(cant.value, 0)));
+      c > 0 ? carrito.set(p.sku, c) : carrito.delete(p.sku);
+      cant.value = c;
+      pintarCarrito();
+    };
+    cant.addEventListener('input', agregar);
+    tb.appendChild(el('tr', null, [
+      el('td', { style: 'white-space:normal;min-width:180px' }, [
+        el('div', { text: p.nombre }),
+        el('div', { class: 'chip', text: p.marca + ' · ' + p.sku, style: 'margin-top:4px' })
+      ]),
+      el('td', { text: p.presentacion }),
+      el('td.num', { text: fmt(p.lista, 2) }),
+      el('td.num', { text: fmt(p.mayorista, 2) }),
+      el('td.num', null, cant),
+      el('td', null, el('button.sm', { text: '+1', onclick: () => { cant.value = (num(cant.value, 0) + 1); agregar(); } }))
+    ]));
+  });
+}
+
+function lineas() {
+  return Array.from(carrito.entries()).map(([sku, cant]) => {
+    const p = PRODUCTOS.find(x => x.sku === sku);
+    const unit = precioPorCantidad(p, cant);
+    return { p, cant, unit, importe: unit * cant };
+  });
+}
+
+function pintarCarrito() {
+  const items = lineas();
+  const tb = $('#carrito'); tb.textContent = '';
+  if (!items.length) {
+    tb.appendChild(el('tr', null, el('td', { colspan: 5, text: 'Agrega productos desde el catálogo.', style: 'color:var(--muted)' })));
+  }
+  items.forEach(({ p, cant, unit, importe }) => {
+    tb.appendChild(el('tr', null, [
+      el('td', { text: p.nombre, style: 'white-space:normal;min-width:140px' }),
+      el('td.num', { text: cant }),
+      el('td.num', { text: fmt(unit, 2) }),
+      el('td.num', { text: fmt(importe, 2) }),
+      el('td', null, el('button.sm.ghost', { text: '✕', onclick: () => { carrito.delete(p.sku); pintarCatalogo(); pintarCarrito(); } }))
+    ]));
+  });
+
+  const sub = items.reduce((s, i) => s + i.importe, 0);
+  const pct = sub >= 5000 ? 0.05 : sub >= 2500 ? 0.03 : sub >= 1000 ? 0.015 : 0;
+  const desc = sub * pct;
+  const neto = sub - desc;
+  const igv = neto * 0.18;
+  $('#sub').textContent = soles(sub);
+  $('#descPct').textContent = fmt(pct * 100, 1) + ' %';
+  $('#desc').textContent = '− ' + soles(desc);
+  $('#igv').textContent = soles(igv);
+  $('#total').textContent = soles(neto + igv);
+}
+
+function documento() {
+  const items = lineas();
+  if (!items.length) return;
+  const sub = items.reduce((s, i) => s + i.importe, 0);
+  const pct = sub >= 5000 ? 0.05 : sub >= 2500 ? 0.03 : sub >= 1000 ? 0.015 : 0;
+  const neto = sub - sub * pct, igv = neto * 0.18;
+  const hoy = new Date().toLocaleDateString('es-PE', { day: '2-digit', month: 'long', year: 'numeric' });
+
+  const cont = $('#docBody'); cont.textContent = '';
+  cont.appendChild(el('div', { style: 'display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:14px' }, [
+    el('div', null, [
+      el('div', { text: 'Cotización N° ' + String(1000 + carrito.size * 7 + items.length), style: 'font:700 18px var(--cond)' }),
+      el('div', { text: hoy, style: 'color:var(--muted);font-size:12px' })
+    ]),
+    el('div', { style: 'text-align:right' }, [
+      el('div', { text: $('#cliente').value, style: 'font-weight:600' }),
+      el('div', { text: 'Validez de la oferta: 15 días', style: 'color:var(--muted);font-size:12px' })
+    ])
+  ]));
+
+  const filas = items.map(i => el('tr', null, [
+    el('td', { text: i.p.sku }),
+    el('td', { text: i.p.nombre + ' · ' + i.p.presentacion, style: 'white-space:normal' }),
+    el('td.num', { text: i.cant }),
+    el('td.num', { text: fmt(i.unit, 2) }),
+    el('td.num', { text: fmt(i.importe, 2) })
+  ]));
+  const tabla = el('table', null, [
+    el('thead', null, el('tr', null, [
+      el('th', { text: 'SKU' }), el('th', { text: 'Descripción' }),
+      el('th.num', { text: 'Cant.' }), el('th.num', { text: 'P. unit.' }), el('th.num', { text: 'Importe' })
+    ])),
+    el('tbody', null, filas)
+  ]);
+  cont.appendChild(el('div.tablewrap', null, tabla));
+  cont.appendChild(el('dl.kv', { style: 'margin-top:14px' }, [
+    el('dt', { text: 'Valor de venta' }), el('dd', { text: soles(sub) }),
+    el('dt', { text: 'Descuento' }), el('dd', { text: '− ' + soles(sub * pct) }),
+    el('dt', { text: 'IGV 18 %' }), el('dd', { text: soles(igv) }),
+    el('dt', { text: 'Total' }), el('dd', { text: soles(neto + igv) })
+  ]));
+  cont.appendChild(el('p.note', { style: 'margin-top:14px', text: 'Precios en soles, incluyen entrega en Lima Metropolitana. Documento de demostración: los datos de catálogo y cliente son de ejemplo.' }));
+  $('#doc').hidden = false;
+  $('#doc').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+opciones($('#linea'), Array.from(new Set(PRODUCTOS.map(p => p.linea))), 'Todas las líneas');
+opciones($('#marca'), Array.from(new Set(PRODUCTOS.map(p => p.marca))), 'Todas las marcas');
+CLIENTES.forEach(c => $('#cliente').appendChild(el('option', { value: c.nombre, text: c.nombre + ' — ' + c.distrito })));
+
+['#q', '#linea', '#marca', '#orden'].forEach(s => $(s).addEventListener('input', pintarCatalogo));
+$('#imprimir').addEventListener('click', documento);
+$('#vaciar').addEventListener('click', () => { carrito.clear(); $('#doc').hidden = true; pintarCatalogo(); pintarCarrito(); });
+
+carrito.set('EMB-101', 24);
+carrito.set('LAC-403', 12);
+carrito.set('EMB-302', 8);
+pintarCatalogo();
+pintarCarrito();
+
+/* ---- exportación de resultados ---- */
+const X = CODE.exportar;
+X.registrar(() => ({
+  titulo: 'Cotización · ' + $('#cliente').value,
+  subtitulo: 'Precios en soles, con escala por volumen',
+  resumen: X.desdeKv('.kv').concat(X.desdeReadouts()),
+  tablas: [{
+    titulo: 'Detalle de la cotización',
+    columnas: ['SKU', 'Producto', 'Cantidad', 'P. unitario', 'Importe'],
+    filas: lineas().map(i => [i.p.sku, i.p.nombre + ' · ' + i.p.presentacion, i.cant, fmt(i.unit, 2), fmt(i.importe, 2)])
+  }],
+  nota: 'Validez de la oferta: 15 días. Catálogo y cliente son datos de ejemplo.'
+}));
+</script>
+</body>
+</html>

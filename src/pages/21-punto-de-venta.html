@@ -1,0 +1,223 @@
+<!--meta
+{
+  "id": "21",
+  "title": "Punto de venta para restaurante",
+  "tagline": "Comandas por mesa que sobreviven al cambio de mesa, carta por categorías, notas de cocina, propina configurable y cálculo de vuelto al cobrar en efectivo.",
+  "area": "negocio",
+  "stack": ["JavaScript", "Estado por mesa", "UI táctil"],
+  "highlights": [
+    "Estado independiente por mesa: se cambia de mesa sin perder la comanda abierta",
+    "Notas por línea para cocina y control de cantidades con teclado o toque",
+    "Cierre de cuenta con división por comensales y vuelto en efectivo"
+  ]
+}
+-->
+
+<section class="panel" style="margin-bottom:16px">
+  <div class="row" style="justify-content:space-between">
+    <div class="row" id="mesas"></div>
+    <div class="row">
+      <span class="chip" id="resumenMesas">—</span>
+      <button class="sm" id="nueva">+ Mesa</button>
+    </div>
+  </div>
+</section>
+
+<div class="cols-2" style="grid-template-columns:minmax(0,1.5fr) minmax(0,1fr)">
+  <div class="stack">
+    <section class="panel">
+      <h2>Carta</h2>
+      <div class="row" id="categorias" style="margin-bottom:14px"></div>
+      <div id="carta" style="display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(min(160px,100%),1fr))"></div>
+    </section>
+  </div>
+
+  <div class="stack">
+    <section class="panel">
+      <h2 id="tituloComanda">Comanda</h2>
+      <div class="tablewrap" style="max-height:320px;overflow-y:auto">
+        <table><thead><tr><th>Ítem</th><th class="num">Cant.</th><th class="num">Importe</th><th></th></tr></thead><tbody id="comanda"></tbody></table>
+      </div>
+      <div class="row" style="margin-top:12px;gap:12px">
+        <div class="field" style="min-width:120px"><label for="propina">Propina %</label><input type="number" id="propina" value="10" min="0" max="20" step="1"></div>
+        <div class="field" style="min-width:120px"><label for="comensales">Comensales</label><input type="number" id="comensales" value="2" min="1" step="1"></div>
+      </div>
+      <dl class="kv" style="margin-top:14px">
+        <dt>Subtotal</dt><dd id="sub">—</dd>
+        <dt>Propina sugerida</dt><dd id="prop">—</dd>
+        <dt>Por comensal</dt><dd id="porPersona">—</dd>
+      </dl>
+      <div class="readout hi" style="margin-top:12px"><span class="k">Total a cobrar</span><span class="v" id="total">—</span></div>
+    </section>
+
+    <section class="panel">
+      <h2>Cobro</h2>
+      <div class="seg" id="medio">
+        <button aria-pressed="true" data-m="efectivo">Efectivo</button>
+        <button aria-pressed="false" data-m="tarjeta">Tarjeta</button>
+        <button aria-pressed="false" data-m="billetera">Billetera móvil</button>
+      </div>
+      <div class="field" style="margin-top:12px" id="cajaEfectivo">
+        <label for="recibido">Monto recibido (S/)</label>
+        <input type="number" id="recibido" value="0" step="1" min="0">
+      </div>
+      <div class="readout" style="margin-top:12px"><span class="k">Vuelto</span><span class="v" id="vuelto">—</span></div>
+      <div class="row" style="margin-top:14px">
+        <button class="primary" id="cerrar">Cerrar cuenta</button>
+        <button class="sm" id="anular">Anular comanda</button>
+      </div>
+      <p class="note" style="margin-top:12px">Pre-cuenta de demostración. No reemplaza el comprobante de pago electrónico que emite el sistema de facturación del negocio.</p>
+    </section>
+  </div>
+</div>
+
+<script>
+const { $, $$, el, num, fmt, soles } = CODE;
+
+const CARTA = [
+  ['Sánguches', 'Pan con chicharrón', 14.0], ['Sánguches', 'Butifarra criolla', 12.5],
+  ['Sánguches', 'Triple de pollo', 10.0], ['Sánguches', 'Hot dog completo', 9.0],
+  ['Sánguches', 'Hamburguesa clásica', 16.0], ['Sánguches', 'Hamburguesa doble queso', 21.0],
+  ['Al plato', 'Salchipapa personal', 13.0], ['Al plato', 'Mostrito', 18.0],
+  ['Al plato', 'Pollo broaster 1/4', 19.0], ['Al plato', 'Alitas BBQ 8 u.', 26.0],
+  ['Al plato', 'Tequeños de queso 6 u.', 15.0], ['Al plato', 'Pizza personal muzzarella', 22.0],
+  ['Bebidas', 'Chicha morada 1/2 L', 6.0], ['Bebidas', 'Limonada frozen', 8.0],
+  ['Bebidas', 'Gaseosa 500 ml', 5.0], ['Bebidas', 'Café pasado', 5.5],
+  ['Postres', 'Torta de chocolate', 11.0], ['Postres', 'Mazamorra morada', 8.0]
+].map(x => ({ categoria: x[0], nombre: x[1], precio: x[2] }));
+
+const CATEGORIAS = Array.from(new Set(CARTA.map(p => p.categoria)));
+let categoria = CATEGORIAS[0];
+
+const mesas = [
+  { id: 1, lineas: [{ nombre: 'Pan con chicharrón', precio: 14, cant: 2, nota: 'sin cebolla' }, { nombre: 'Chicha morada 1/2 L', precio: 6, cant: 2, nota: '' }] },
+  { id: 2, lineas: [] }, { id: 3, lineas: [] }, { id: 4, lineas: [] }, { id: 5, lineas: [] }
+];
+let mesaActiva = 1, medio = 'efectivo';
+
+const mesa = () => mesas.find(m => m.id === mesaActiva);
+const totalMesa = m => m.lineas.reduce((s, l) => s + l.precio * l.cant, 0);
+
+function pintarMesas() {
+  const cont = $('#mesas'); cont.textContent = '';
+  mesas.forEach(m => {
+    const t = totalMesa(m);
+    const b = el('button', {
+      class: m.id === mesaActiva ? 'primary' : (t > 0 ? 'sm' : 'sm ghost'),
+      text: 'Mesa ' + m.id + (t > 0 ? ' · ' + soles(t, 0) : '')
+    });
+    b.addEventListener('click', () => { mesaActiva = m.id; render(); });
+    cont.appendChild(b);
+  });
+  const ocupadas = mesas.filter(m => m.lineas.length).length;
+  $('#resumenMesas').textContent = ocupadas + ' de ' + mesas.length + ' mesas ocupadas · ' + soles(mesas.reduce((s, m) => s + totalMesa(m), 0), 0) + ' en salón';
+}
+
+function pintarCategorias() {
+  const cont = $('#categorias'); cont.textContent = '';
+  const seg = el('div.seg');
+  CATEGORIAS.forEach(c => {
+    const b = el('button', { text: c, 'aria-pressed': String(c === categoria) });
+    b.addEventListener('click', () => { categoria = c; pintarCategorias(); pintarCarta(); });
+    seg.appendChild(b);
+  });
+  cont.appendChild(seg);
+}
+
+function pintarCarta() {
+  const cont = $('#carta'); cont.textContent = '';
+  CARTA.filter(p => p.categoria === categoria).forEach(p => {
+    const b = el('button', {
+      style: 'flex-direction:column;align-items:flex-start;gap:6px;padding:12px;text-align:left;height:100%'
+    }, [
+      el('span', { text: p.nombre, style: 'font-size:13px;font-weight:600' }),
+      el('span', { text: soles(p.precio), style: 'font:600 12px var(--mono);color:var(--accent)' })
+    ]);
+    b.addEventListener('click', () => agregar(p));
+    cont.appendChild(b);
+  });
+}
+
+function agregar(p) {
+  const m = mesa();
+  const existente = m.lineas.find(l => l.nombre === p.nombre && !l.nota);
+  existente ? existente.cant++ : m.lineas.push({ nombre: p.nombre, precio: p.precio, cant: 1, nota: '' });
+  render();
+}
+
+function pintarComanda() {
+  const m = mesa();
+  $('#tituloComanda').textContent = 'Comanda · Mesa ' + m.id;
+  const tb = $('#comanda'); tb.textContent = '';
+  if (!m.lineas.length) tb.appendChild(el('tr', null, el('td', { colspan: 4, text: 'Mesa libre. Toca un plato de la carta.', style: 'color:var(--muted)' })));
+
+  m.lineas.forEach((l, i) => {
+    const nota = el('input', { type: 'text', value: l.nota, placeholder: 'nota para cocina', 'aria-label': 'nota ' + l.nombre, style: 'margin-top:6px;font-size:12px' });
+    nota.addEventListener('input', () => { l.nota = nota.value; });
+    tb.appendChild(el('tr', null, [
+      el('td', { style: 'white-space:normal;min-width:150px' }, [el('div', { text: l.nombre }), nota]),
+      el('td.num', null, el('div.row', { style: 'gap:4px;flex-wrap:nowrap;justify-content:flex-end' }, [
+        el('button.sm.ghost', { text: '−', onclick: () => { l.cant--; if (l.cant <= 0) m.lineas.splice(i, 1); render(); } }),
+        el('span', { text: String(l.cant), style: 'font:600 13px var(--mono);min-width:18px;text-align:center' }),
+        el('button.sm.ghost', { text: '+', onclick: () => { l.cant++; render(); } })
+      ])),
+      el('td.num', { text: fmt(l.precio * l.cant, 2) }),
+      el('td', null, el('button.sm.ghost', { text: '✕', onclick: () => { m.lineas.splice(i, 1); render(); } }))
+    ]));
+  });
+
+  const sub = totalMesa(m);
+  const prop = sub * num($('#propina').value, 0) / 100;
+  const total = sub + prop;
+  const com = Math.max(1, Math.round(num($('#comensales').value, 1)));
+  $('#sub').textContent = soles(sub);
+  $('#prop').textContent = soles(prop);
+  $('#porPersona').textContent = soles(total / com);
+  $('#total').textContent = soles(total);
+
+  const recibido = num($('#recibido').value, 0);
+  $('#vuelto').textContent = medio !== 'efectivo' ? 'No aplica'
+    : recibido >= total && total > 0 ? soles(recibido - total)
+    : total > 0 ? 'Faltan ' + soles(total - recibido) : soles(0);
+  $('#cajaEfectivo').hidden = medio !== 'efectivo';
+}
+
+function render() { pintarMesas(); pintarComanda(); }
+
+$('#nueva').addEventListener('click', () => {
+  mesas.push({ id: mesas.length + 1, lineas: [] });
+  mesaActiva = mesas.length;
+  render();
+});
+$('#cerrar').addEventListener('click', () => {
+  const m = mesa();
+  if (!m.lineas.length) return;
+  m.lineas = [];
+  $('#recibido').value = 0;
+  render();
+});
+$('#anular').addEventListener('click', () => { mesa().lineas = []; render(); });
+$$('#medio button').forEach(b => b.addEventListener('click', () => {
+  $$('#medio button').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+  medio = b.dataset.m;
+  pintarComanda();
+}));
+['#propina', '#comensales', '#recibido'].forEach(s => $(s).addEventListener('input', pintarComanda));
+
+pintarCategorias(); pintarCarta(); render();
+
+/* ---- exportación de resultados ---- */
+const X = CODE.exportar;
+X.registrar(() => ({
+  titulo: 'Pre-cuenta · Mesa ' + mesaActiva,
+  subtitulo: mesa().lineas.reduce((s, l) => s + l.cant, 0) + ' ítems · ' + $('#comensales').value + ' comensales',
+  resumen: X.desdeKv('.kv').concat(X.desdeReadouts()),
+  tablas: [{
+    titulo: 'Comanda',
+    columnas: ['Ítem', 'Nota', 'Cantidad', 'P. unitario', 'Importe'],
+    filas: mesa().lineas.map(l => [l.nombre, l.nota, l.cant, fmt(l.precio, 2), fmt(l.precio * l.cant, 2)])
+  }],
+  nota: 'Pre-cuenta de demostración. No reemplaza el comprobante de pago electrónico del negocio.'
+}));
+
+</script>

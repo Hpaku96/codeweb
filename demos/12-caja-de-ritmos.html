@@ -1,0 +1,735 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>MPC-16 · caja de ritmos con samples · CODE</title>
+<meta name="description" content="Máquina de 16 pads: voces sintetizadas de fábrica, carga de tus propios samples, secuenciador de 16 pasos, grabación de la sesión y exportación a WAV o MP3. Make a Sample detecta el BPM de un audio, lo sincroniza al tempo y lo parte en 16 cortes exactos.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20100%20100%22%3E%3Ccircle%20cx%3D%2250%22%20cy%3D%2250%22%20r%3D%2241%22%20fill%3D%22none%22%20stroke%3D%22%2523E7B93D%22%20stroke-width%3D%228%22%2F%3E%3Cg%20fill%3D%22none%22%20stroke%3D%22%2523E7B93D%22%20stroke-width%3D%225%22%20stroke-linecap%3D%22round%22%3E%3Cpath%20d%3D%22M30%2026%20L52%2048%22%2F%3E%3Cpath%20d%3D%22M24%2034%20L40%2050%20L40%2058%22%2F%3E%3Cpath%20d%3D%22M20%2044%20L30%2054%20L30%2064%22%2F%3E%3C%2Fg%3E%3Cg%20fill%3D%22%2523E7B93D%22%3E%3Ccircle%20cx%3D%2252%22%20cy%3D%2248%22%20r%3D%225.5%22%2F%3E%3Ccircle%20cx%3D%2240%22%20cy%3D%2258%22%20r%3D%225.5%22%2F%3E%3Ccircle%20cx%3D%2230%22%20cy%3D%2264%22%20r%3D%225.5%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E">
+<script>(function(){try{var t=localStorage.getItem('code-theme');if(t!=='light'&&t!=='dark'){t=matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';}document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="../assets/demo.css">
+<link rel="stylesheet" href="../assets/maquina.css">
+</head>
+<body>
+<div class="wrap">
+<header class="demo-head">
+  <a class="brand-bar" href="../index.html">
+    <svg viewBox="0 0 100 100" width="20" height="20" aria-hidden="true">
+      <circle cx="50" cy="50" r="41" fill="none" stroke="currentColor" stroke-width="7"/>
+      <g fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round">
+        <path d="M30 26 L52 48"/>
+        <path d="M24 34 L40 50 L40 58"/>
+        <path d="M20 44 L30 54 L30 64"/>
+      </g>
+      <g fill="currentColor">
+        <circle cx="52" cy="48" r="5"/>
+        <circle cx="40" cy="58" r="5"/>
+        <circle cx="30" cy="64" r="5"/>
+      </g>
+    </svg>
+    <span>CODE</span>
+  </a>
+  <span class="idx">12</span>
+  <h1>MPC-16 · caja de ritmos con samples</h1>
+  <div class="head-actions">
+    <button type="button" class="theme-toggle" id="themeToggle" aria-pressed="false"></button>
+    <a class="back" href="../index.html">← Portafolio</a>
+  </div>
+  <p class="sub">Máquina de 16 pads: voces sintetizadas de fábrica, carga de tus propios samples, secuenciador de 16 pasos, grabación de la sesión y exportación a WAV o MP3. Make a Sample detecta el BPM de un audio, lo sincroniza al tempo y lo parte en 16 cortes exactos.</p>
+</header>
+<div id="maquina"></div>
+
+<section class="panel">
+  <h2>Cómo se toca</h2>
+  <div class="cols">
+    <p class="note"><strong>Pads.</strong> Toca un pad para escucharlo y seleccionarlo. Las teclas <code>1</code>–<code>4</code>, <code>Q</code>–<code>R</code>, <code>A</code>–<code>F</code> y <code>Z</code>–<code>V</code> corresponden a las cuatro filas.</p>
+    <p class="note"><strong>Secuencia.</strong> Los 16 pasos de abajo pertenecen al pad seleccionado. Un clic enciende el paso, otro lo convierte en acento y el tercero lo apaga.</p>
+    <p class="note"><strong>Samples.</strong> Carga un audio en el pad seleccionado con <em>Cargar</em>, o usa <em>Make a Sample</em> para trocear un loop completo y repartirlo entre los 16 pads.</p>
+    <p class="note"><strong>Grabación.</strong> <em>Rec</em> captura la salida mientras tocas o suena la secuencia; al detener, se exporta en WAV o MP3.</p>
+  </div>
+</section>
+<footer class="demo-foot">
+  <span>CODE · Audio y música · demo 12 de 30</span>
+  <span>Web Audio API · Detección de BPM · WAV / MP3 · Canvas</span>
+</footer>
+</div>
+<script src="../assets/demo.js"></script>
+<script src="../assets/exportar.js"></script>
+<script src="../assets/audio.js"></script>
+<script src="../assets/grabar.js"></script>
+<script src="../assets/maquina.js"></script>
+<script>
+const { $, el, fmt } = CODE;
+const A = AUDIO, M = MAQUINA, G = GRABAR;
+
+/* ================= modelo ================= */
+
+const PASOS = 16;
+
+/* Voces de fábrica: un sintetizador de percusión con pocos parámetros
+   cubre las dieciséis sin un solo archivo de audio. */
+const FABRICA = [
+  ['Bombo',      { osc: { tipo: 'sine', f0: 140, f1: 44, dec: 0.42 } }],
+  ['Bombo largo',{ osc: { tipo: 'sine', f0: 110, f1: 38, dec: 0.62 } }],
+  ['Caja',       { osc: { tipo: 'triangle', f0: 190, f1: 180, dec: 0.11, g: 0.5 }, ruido: { f: 1900, q: 0.9, tipo: 'bandpass', dec: 0.19, g: 0.85 } }],
+  ['Caja aguda', { osc: { tipo: 'triangle', f0: 260, f1: 250, dec: 0.08, g: 0.4 }, ruido: { f: 2700, q: 1.1, tipo: 'bandpass', dec: 0.12, g: 0.9 } }],
+  ['Palmas',     { palmas: true }],
+  ['Aro',        { osc: { tipo: 'square', f0: 420, f1: 400, dec: 0.05, g: 0.5 }, ruido: { f: 800, tipo: 'highpass', dec: 0.04, g: 0.35 } }],
+  ['Hi-hat',     { ruido: { f: 7200, tipo: 'highpass', dec: 0.045, g: 0.5 } }],
+  ['Hi-hat ab.', { ruido: { f: 7200, tipo: 'highpass', dec: 0.34, g: 0.45 } }],
+  ['Tom bajo',   { osc: { tipo: 'sine', f0: 170, f1: 82, dec: 0.34 } }],
+  ['Tom alto',   { osc: { tipo: 'sine', f0: 265, f1: 125, dec: 0.27 } }],
+  ['Cencerro',   { cencerro: true }],
+  ['Clave',      { osc: { tipo: 'sine', f0: 2400, f1: 2200, dec: 0.05, g: 0.5 }, ruido: { f: 3000, tipo: 'bandpass', q: 4, dec: 0.03, g: 0.3 } }],
+  ['Shaker',     { ruido: { f: 6200, tipo: 'highpass', dec: 0.09, g: 0.38, ataque: 0.012 } }],
+  ['Crash',      { ruido: { f: 4600, tipo: 'highpass', dec: 1.3, g: 0.34 } }],
+  ['Zap',        { osc: { tipo: 'sawtooth', f0: 900, f1: 70, dec: 0.18, g: 0.45 } }],
+  ['Sub',        { osc: { tipo: 'sine', f0: 58, f1: 48, dec: 0.5 } }]
+];
+
+const pads = FABRICA.map(([nombre, cfg], i) => ({
+  indice: i, nombre, cfg,
+  buffer: null, offset: 0, dur: 0, rate: 1,
+  fuente: '', vol: 0.85, tono: 0
+}));
+
+const patron = pads.map(() => new Array(PASOS).fill(0));
+
+const PRESETS = {
+  house:  { 0: [2,0,0,0,2,0,0,0,2,0,0,0,2,0,0,0], 2: [0,0,0,0,2,0,0,0,0,0,0,0,2,0,0,1],
+            6: [0,0,1,0,0,0,1,0,0,0,1,0,0,0,1,0], 7: [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+            4: [0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0], 10:[0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0] },
+  hiphop: { 0: [2,0,0,0,0,0,1,0,0,0,2,0,0,0,0,0], 2: [0,0,0,0,2,0,0,0,0,0,0,0,2,0,0,0],
+            6: [1,0,1,0,1,0,1,1,1,0,1,0,1,0,1,0], 5: [0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0],
+            8: [0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0] },
+  cumbia: { 0: [2,0,0,0,1,0,0,0,2,0,0,0,1,0,0,0], 2: [0,0,1,0,0,0,1,0,0,0,1,0,0,0,1,0],
+            5: [0,0,0,0,2,0,0,0,0,0,0,0,2,0,0,0], 6: [1,0,1,1,1,0,1,1,1,0,1,1,1,0,1,1],
+            10:[2,0,0,1,0,0,2,0,0,1,0,0,2,0,0,0] },
+  trap:   { 0: [2,0,0,0,0,0,0,2,0,0,1,0,0,0,0,0], 2: [0,0,0,0,2,0,0,0,0,0,0,0,2,0,0,0],
+            6: [1,0,1,1,1,0,1,0,1,1,1,0,1,0,1,1], 15:[2,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0] },
+  vacio:  {}
+};
+
+let tempo = 96, swing = 18, volumen = 0.8;
+let padSel = 0, tocando = false, paso = 0, proximo = 0, temporizador = null, pasoVisible = -1;
+let maestro = null, grabadora = null, grabando = false, ultimaGrabacion = 0;
+const LOOKAHEAD = 0.1, INTERVALO = 25;
+
+/* ================= síntesis ================= */
+
+function envolvente(c, t, pico, dec, ataque) {
+  const g = c.createGain();
+  g.gain.setValueAtTime(0, t);
+  g.gain.linearRampToValueAtTime(pico, t + (ataque || 0.003));
+  g.gain.exponentialRampToValueAtTime(0.0007, t + dec);
+  return g;
+}
+
+function ruidoFuente(c, dur) {
+  const n = Math.max(1, Math.floor(c.sampleRate * dur));
+  const b = c.createBuffer(1, n, c.sampleRate);
+  const d = b.getChannelData(0);
+  for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
+  const s = c.createBufferSource();
+  s.buffer = b;
+  return s;
+}
+
+/** Toca la voz sintética de un pad en el instante t. */
+function sintetizar(c, t, vel, pad) {
+  const cfg = pad.cfg;
+  const semitono = Math.pow(2, pad.tono / 12);
+  const v = vel * pad.vol;
+
+  if (cfg.palmas) {
+    [0, 0.012, 0.024].forEach(off => {
+      const n = ruidoFuente(c, 0.12), f = c.createBiquadFilter();
+      f.type = 'bandpass'; f.frequency.value = 1100 * semitono; f.Q.value = 1.6;
+      const g = envolvente(c, t + off, v * 0.55, 0.1);
+      n.connect(f); f.connect(g); g.connect(maestro); n.start(t + off);
+    });
+    return;
+  }
+  if (cfg.cencerro) {
+    [540, 800].forEach(fr => {
+      const o = c.createOscillator(); o.type = 'square'; o.frequency.value = fr * semitono;
+      const f = c.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 2600; f.Q.value = 1.2;
+      const g = envolvente(c, t, v * 0.26, 0.24);
+      o.connect(f); f.connect(g); g.connect(maestro); o.start(t); o.stop(t + 0.3);
+    });
+    return;
+  }
+  if (cfg.osc) {
+    const o = c.createOscillator();
+    o.type = cfg.osc.tipo;
+    o.frequency.setValueAtTime(cfg.osc.f0 * semitono, t);
+    o.frequency.exponentialRampToValueAtTime(Math.max(20, cfg.osc.f1 * semitono), t + cfg.osc.dec * 0.5);
+    const g = envolvente(c, t, v * (cfg.osc.g || 1), cfg.osc.dec);
+    o.connect(g); g.connect(maestro);
+    o.start(t); o.stop(t + cfg.osc.dec + 0.1);
+  }
+  if (cfg.ruido) {
+    const n = ruidoFuente(c, cfg.ruido.dec + 0.05);
+    const f = c.createBiquadFilter();
+    f.type = cfg.ruido.tipo;
+    f.frequency.value = cfg.ruido.f * semitono;
+    if (cfg.ruido.q) f.Q.value = cfg.ruido.q;
+    const g = envolvente(c, t, v * cfg.ruido.g, cfg.ruido.dec, cfg.ruido.ataque);
+    n.connect(f); f.connect(g); g.connect(maestro);
+    n.start(t);
+  }
+}
+
+/** Dispara un pad: su sample si lo tiene, o su voz de fábrica. */
+function disparar(indice, t, vel) {
+  const c = A.ctx();
+  const pad = pads[indice];
+  if (!maestro) return;
+  if (pad.buffer) {
+    const s = c.createBufferSource();
+    s.buffer = pad.buffer;
+    s.playbackRate.value = pad.rate * Math.pow(2, pad.tono / 12);
+    const g = c.createGain();
+    g.gain.value = vel * pad.vol;
+    s.connect(g); g.connect(maestro);
+    const dur = pad.dur || (pad.buffer.duration - pad.offset);
+    s.start(t, pad.offset, dur);
+  } else {
+    sintetizar(c, t, vel, pad);
+  }
+}
+
+/* ================= transporte ================= */
+
+const duracionPaso = () => 60 / tempo / 4;
+
+function reloj() {
+  const c = A.ctx();
+  while (proximo < c.currentTime + LOOKAHEAD) {
+    const desfase = (paso % 2 === 1) ? duracionPaso() * (swing / 100) * 0.5 : 0;
+    const cuando = proximo + desfase;
+    pads.forEach((p, i) => {
+      const v = patron[i][paso];
+      if (v) disparar(i, cuando, v === 2 ? 1 : 0.62);
+    });
+    const p = paso;
+    setTimeout(() => { pasoVisible = p; pintarSecuencia(); pintarLcd(); },
+      Math.max(0, (cuando - c.currentTime) * 1000));
+    proximo += duracionPaso();
+    paso = (paso + 1) % PASOS;
+  }
+  temporizador = setTimeout(reloj, INTERVALO);
+}
+
+async function prepararAudio() {
+  const c = await A.resume();
+  if (!maestro) {
+    maestro = c.createGain();
+    maestro.gain.value = volumen;
+    maestro.connect(c.destination);
+    grabadora = G.grabadora(c, maestro);
+  }
+  return c;
+}
+
+async function tocar() {
+  const c = await prepararAudio();
+  paso = 0;
+  proximo = c.currentTime + 0.08;
+  tocando = true;
+  btnPlay.encender(true);
+  ledPlay.encender(true);
+  reloj();
+  pintarLcd();
+}
+
+function detener() {
+  tocando = false;
+  clearTimeout(temporizador);
+  pasoVisible = -1;
+  btnPlay.encender(false);
+  ledPlay.encender(false);
+  pintarSecuencia();
+  pintarLcd();
+}
+
+/* ================= grabación ================= */
+
+async function alternarGrabacion() {
+  await prepararAudio();
+  if (!grabando) {
+    grabadora.iniciar();
+    grabando = true;
+    ledRec.encender(true);
+    btnRec.encender(true);
+    if (!tocando) tocar();
+  } else {
+    grabadora.detener();
+    grabando = false;
+    ultimaGrabacion = grabadora.duracion;
+    ledRec.encender(false);
+    btnRec.encender(false);
+    btnWav.disabled = btnMp3.disabled = false;
+  }
+  pintarLcd();
+}
+
+async function exportarAudio(formato) {
+  if (!grabadora || grabadora.vacia) return;
+  const boton = formato === 'mp3' ? btnMp3 : btnWav;
+  const etiqueta = formato === 'mp3' ? 'MP3' : 'WAV';
+  boton.texto('…');
+  try {
+    const blob = await grabadora.exportar(formato, 192);
+    CODE.exportar.descargar('mpc16-' + Date.now() + '.' + formato, blob);
+    mensaje('Exportado ' + etiqueta + ' · ' + fmt(ultimaGrabacion, 1) + ' s');
+  } catch (e) {
+    mensaje('No se pudo cargar el codificador MP3; exporta en WAV');
+  }
+  boton.texto(etiqueta);
+}
+
+let mensajeTemporizador = null;
+let mensajeActual = '';
+function mensaje(texto) {
+  mensajeActual = texto;
+  pintarLcd();
+  clearTimeout(mensajeTemporizador);
+  mensajeTemporizador = setTimeout(() => { mensajeActual = ''; pintarLcd(); }, 4000);
+}
+
+/* ================= Make a Sample ================= */
+
+const muestra = {
+  buffer: null, nombre: '', bpm: 0, confianza: 0,
+  inicio: 0, compases: 1, cortes: []
+};
+
+async function cargarParaTrocear(archivo) {
+  const c = await prepararAudio();
+  muestra.buffer = await c.decodeAudioData(await archivo.arrayBuffer());
+  muestra.nombre = archivo.name;
+  const d = G.detectarBpm(muestra.buffer);
+  muestra.bpm = G.bpmUsable(d.bpm, 70, 180);
+  muestra.confianza = d.confianza;
+  muestra.inicio = d.inicio;
+  recalcularCortes();
+  mensaje('BPM detectado: ' + fmt(muestra.bpm, 1));
+}
+
+/** Longitud de la región en segundos del archivo original. */
+function largoRegion() {
+  if (!muestra.buffer || !muestra.bpm) return 0;
+  return (60 / muestra.bpm) * 4 * muestra.compases;
+}
+
+function recalcularCortes() {
+  muestra.cortes = [];
+  if (!muestra.buffer) { pintarOnda(); return; }
+  const largo = largoRegion();
+  const maxInicio = Math.max(0, muestra.buffer.duration - largo);
+  muestra.inicio = Math.min(muestra.inicio, maxInicio);
+  const paso = largo / PASOS;
+  for (let i = 0; i < PASOS; i++) {
+    muestra.cortes.push({ offset: muestra.inicio + i * paso, dur: paso });
+  }
+  pintarOnda();
+  pintarLcd();
+}
+
+/** Reparte los 16 cortes entre los 16 pads, ya ajustados al tempo de la máquina. */
+function repartirCortes() {
+  if (!muestra.cortes.length) return;
+  const rate = muestra.bpm / tempo;   // el corte dura un paso del secuenciador
+  muestra.cortes.forEach((corte, i) => {
+    pads[i].buffer = muestra.buffer;
+    pads[i].offset = corte.offset;
+    pads[i].dur = corte.dur;
+    pads[i].rate = rate;
+    pads[i].nombre = 'Corte ' + (i + 1);
+    pads[i].fuente = muestra.nombre.slice(0, 14);
+    padsUi[i].renombrar(pads[i].nombre, pads[i].fuente);
+  });
+  mensaje('16 cortes repartidos · ×' + fmt(rate, 3));
+}
+
+function asignarCorteAlPad(i) {
+  const corte = muestra.cortes[i];
+  if (!corte) return;
+  const p = pads[padSel];
+  p.buffer = muestra.buffer;
+  p.offset = corte.offset;
+  p.dur = corte.dur;
+  p.rate = muestra.bpm / tempo;
+  p.nombre = 'Corte ' + (i + 1);
+  p.fuente = muestra.nombre.slice(0, 14);
+  padsUi[padSel].renombrar(p.nombre, p.fuente);
+  disparar(padSel, A.ctx().currentTime, 1);
+  pintarLcd();
+}
+
+async function cargarEnPad(archivo) {
+  const c = await prepararAudio();
+  const buffer = await c.decodeAudioData(await archivo.arrayBuffer());
+  const p = pads[padSel];
+  p.buffer = buffer;
+  p.offset = 0;
+  p.dur = 0;
+  p.rate = 1;
+  p.nombre = archivo.name.replace(/\.[^.]+$/, '').slice(0, 12);
+  p.fuente = fmt(buffer.duration, 2) + ' s';
+  padsUi[padSel].renombrar(p.nombre, p.fuente);
+  disparar(padSel, c.currentTime, 1);
+  mensaje('Sample cargado en el pad ' + (padSel + 1));
+}
+
+function limpiarPad() {
+  const p = pads[padSel];
+  p.buffer = null; p.offset = 0; p.dur = 0; p.rate = 1;
+  p.nombre = FABRICA[padSel][0];
+  p.fuente = '';
+  padsUi[padSel].renombrar(p.nombre, '');
+  mensaje('Pad ' + (padSel + 1) + ' de vuelta a la voz de fábrica');
+}
+
+/* ================= interfaz ================= */
+
+const padsUi = [];
+const botonesCompas = [];
+let btnPlay, btnRec, btnWav, btnMp3, ledPlay, ledRec, pantalla, onda, secuencia, perillaTono, perillaVol;
+
+/** Testigo de encendido: siempre iluminado mientras la página está abierta. */
+function ledEncendido() {
+  const l = M.led('Power');
+  l.encender(true);
+  return l;
+}
+
+function construir() {
+  const { maquina, panel, pie } = M.chasis({
+    marca: 'CODE',
+    modelo: 'MPC-16 · sampling drum machine',
+    derecha: [
+      (ledPlay = M.led('Play', 'verde')),
+      (ledRec = M.led('Rec', 'rojo')),
+      ledEncendido()
+    ],
+    pie: [el('span', { text: 'Motor de audio nativo del navegador · sin librerías' })]
+  });
+
+  /* --- columna izquierda: pantalla y transporte --- */
+  pantalla = M.lcd(96);
+  const transporte = el('div.fila-botones', null, [
+    (btnPlay = M.boton({ texto: '▶ Play', pie: 'espacio', onClick: () => tocando ? detener() : tocar() })),
+    M.boton({ texto: '■ Stop', onClick: detener }),
+    (btnRec = M.boton({ texto: '● Rec', pie: 'graba la salida', onClick: alternarGrabacion })),
+    M.boton({ texto: 'Clear', pie: 'borra el patrón', onClick: () => {
+      patron.forEach(f => f.fill(0));
+      pintarSecuencia();
+      mensaje('Patrón vacío');
+    } })
+  ]);
+
+  const perillas = el('div.fila-perillas', null, [
+    M.perilla({ nombre: 'Tempo', min: 60, max: 180, valor: tempo, paso: 1,
+      formato: v => fmt(v, 0) + ' BPM',
+      onCambio: v => { tempo = v; if (muestra.buffer) recalcularCortes(); pintarLcd(); } }),
+    M.perilla({ nombre: 'Swing', min: 0, max: 60, valor: swing, paso: 1,
+      formato: v => fmt(v, 0) + ' %', onCambio: v => { swing = v; pintarLcd(); } }),
+    (perillaVol = M.perilla({ nombre: 'Master', min: 0, max: 1, valor: volumen,
+      formato: v => fmt(v * 100, 0) + ' %',
+      onCambio: v => { volumen = v; if (maestro) maestro.gain.value = v; } })),
+    (perillaTono = M.perilla({ nombre: 'Tune pad', min: -12, max: 12, valor: 0, paso: 0.5,
+      formato: v => (v > 0 ? '+' : '') + fmt(v, 1) + ' st',
+      onCambio: v => { pads[padSel].tono = v; } }))
+  ]);
+
+  const exportar = el('div.fila-botones', null, [
+    (btnWav = M.boton({ texto: 'WAV', pie: 'sin pérdida', onClick: () => exportarAudio('wav') })),
+    (btnMp3 = M.boton({ texto: 'MP3', pie: '192 kbps', onClick: () => exportarAudio('mp3') }))
+  ]);
+  btnWav.disabled = btnMp3.disabled = true;
+
+  const preset = el('select', {
+    'aria-label': 'Patrón de fábrica',
+    style: 'width:100%;font:500 11px var(--mono);background:rgba(0,0,0,.35);color:#e9e4d8;border:1px solid rgba(255,252,244,.18);border-radius:3px;padding:7px'
+  });
+  [['house', 'House'], ['hiphop', 'Hip hop'], ['cumbia', 'Cumbia'], ['trap', 'Trap'], ['vacio', 'Vacío']]
+    .forEach(([v, t]) => preset.appendChild(el('option', { value: v, text: 'Patrón · ' + t })));
+  preset.addEventListener('change', () => cargarPreset(preset.value));
+
+  panel.appendChild(M.modulo('Transporte', [pantalla, el('div', { style: 'height:12px' }), transporte, el('div', { style: 'height:10px' }), preset], 'sp4'));
+  panel.appendChild(M.modulo('Control', [perillas, el('div', { style: 'height:10px' }), el('h3', { text: 'Exportar grabación', style: 'margin-top:4px' }), exportar], 'sp3'));
+
+  /* --- pads --- */
+  const rejilla = el('div.pads');
+  pads.forEach((p, i) => {
+    const b = M.pad({
+      indice: i, nombre: p.nombre, fuente: p.fuente,
+      onGolpe: async () => {
+        await prepararAudio();
+        seleccionarPad(i);
+        disparar(i, A.ctx().currentTime, 1);
+      }
+    });
+    padsUi.push(b);
+    rejilla.appendChild(b);
+  });
+  const acciones = el('div.fila-botones', { style: 'margin-top:12px' }, [
+    M.botonArchivo({ texto: 'Cargar', pie: 'sample al pad', id: 'archPad', onArchivo: f => f[0] && cargarEnPad(f[0]) }),
+    M.boton({ texto: 'Escuchar', onClick: async () => { await prepararAudio(); disparar(padSel, A.ctx().currentTime, 1); } }),
+    M.boton({ texto: 'Fábrica', pie: 'quita el sample', onClick: limpiarPad })
+  ]);
+  panel.appendChild(M.modulo('Pads', [rejilla, acciones], 'sp5'));
+
+  /* --- secuenciador --- */
+  secuencia = el('div', { style: 'display:grid;grid-template-columns:repeat(16,1fr);gap:5px' });
+  panel.appendChild(M.modulo('Secuencia del pad seleccionado', [
+    secuencia,
+    el('p', { style: 'margin:10px 0 0;font:500 9px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--m-suave)',
+      text: 'Un clic enciende · dos, acento · tres, apaga' })
+  ]));
+
+  /* --- make a sample --- */
+  onda = el('canvas.pantalla', { height: 150, style: 'height:150px;cursor:crosshair' });
+  [1, 2, 4].forEach((n, i) => {
+    botonesCompas.push(M.boton({
+      texto: n === 1 ? '1 compás' : String(n),
+      pie: i === 0 ? 'región' : '',
+      etiqueta: 'Región de ' + n + ' compás' + (n > 1 ? 'es' : ''),
+      onClick: () => { muestra.compases = n; recalcularCortes(); marcarCompases(); }
+    }));
+  });
+  const controlesMuestra = el('div.fila-botones', { style: 'margin-top:12px' }, [
+    M.botonArchivo({ texto: 'Abrir audio', pie: 'wav, mp3, m4a', id: 'archMuestra', onArchivo: f => f[0] && cargarParaTrocear(f[0]) })
+  ].concat(botonesCompas, [
+    M.boton({ texto: 'Repartir', pie: 'a los 16 pads', onClick: repartirCortes }),
+    M.boton({ texto: 'Escuchar', pie: 'la región', onClick: escucharRegion })
+  ]));
+  panel.appendChild(M.modulo('Make a Sample', [
+    onda, controlesMuestra,
+    el('p', { style: 'margin:10px 0 0;font:500 9px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--m-suave)',
+      text: 'Arrastra sobre la onda para mover la región · toca un corte para asignarlo al pad seleccionado' })
+  ]));
+
+  $('#maquina').appendChild(maquina);
+  marcarCompases();
+}
+
+function marcarCompases() {
+  [1, 2, 4].forEach((n, i) => botonesCompas[i] && botonesCompas[i].encender(muestra.compases === n));
+}
+
+function seleccionarPad(i) {
+  padSel = i;
+  padsUi.forEach((b, k) => b.classList.toggle('encendido', k === i));
+  perillaTono.fijar(pads[i].tono, false);
+  pintarSecuencia();
+  pintarLcd();
+}
+
+function cargarPreset(nombre) {
+  patron.forEach(f => f.fill(0));
+  Object.entries(PRESETS[nombre] || {}).forEach(([i, filas]) => {
+    patron[+i] = filas.slice();
+  });
+  pintarSecuencia();
+  mensaje('Patrón ' + nombre);
+}
+
+function pintarSecuencia() {
+  secuencia.textContent = '';
+  for (let i = 0; i < PASOS; i++) {
+    const v = patron[padSel][i];
+    const activo = i === pasoVisible;
+    const b = el('button', {
+      type: 'button',
+      'aria-label': 'Paso ' + (i + 1),
+      'aria-pressed': String(v > 0),
+      style: 'height:34px;border-radius:3px;cursor:pointer;padding:0;' +
+        'border:1px solid ' + (activo ? 'var(--m-oro)' : 'rgba(255,252,244,.16)') + ';' +
+        'background:' + (v === 2 ? 'var(--m-oro)' : v === 1 ? 'rgba(231,185,61,.45)' : (i % 4 === 0 ? 'rgba(255,252,244,.09)' : 'rgba(0,0,0,.25)')) + ';' +
+        'box-shadow:' + (activo ? '0 0 0 2px rgba(231,185,61,.35)' : 'none')
+    });
+    b.addEventListener('click', () => {
+      patron[padSel][i] = (patron[padSel][i] + 1) % 3;
+      pintarSecuencia();
+    });
+    secuencia.appendChild(b);
+  }
+}
+
+function pintarLcd() {
+  const p = pads[padSel];
+  const fuente = p.buffer ? (p.fuente || 'sample') : 'voz de fábrica';
+  pantalla.escribir(
+    '<div class="fila"><span class="grande">' + fmt(tempo, 0) + '</span>' +
+    '<span class="tenue">' + (tocando ? 'PLAY' : 'STOP') + (grabando ? ' · REC' : '') + '</span></div>' +
+    '<div class="fila"><span class="tenue">BPM · swing ' + fmt(swing, 0) + ' %</span>' +
+    '<span class="tenue">paso ' + (pasoVisible >= 0 ? String(pasoVisible + 1).padStart(2, '0') : '--') + '/16</span></div>' +
+    '<div class="fila"><span>PAD ' + String(padSel + 1).padStart(2, '0') + ' ' + p.nombre + '</span>' +
+    '<span class="tenue">' + fuente + '</span></div>' +
+    (muestra.buffer
+      ? '<div class="fila"><span class="tenue">' + muestra.nombre.slice(0, 18) + '</span><span class="tenue">' +
+        fmt(muestra.bpm, 1) + ' BPM · ' + muestra.compases + ' compás' + (muestra.compases > 1 ? 'es' : '') + '</span></div>'
+      : '') +
+    (mensajeActual ? '<div style="margin-top:4px">' + mensajeActual + '</div>' : '') +
+    (ultimaGrabacion && !grabando ? '<div class="fila"><span class="tenue">grabación</span><span class="tenue">' + fmt(ultimaGrabacion, 1) + ' s</span></div>' : '')
+  );
+}
+
+/* ---- onda de Make a Sample ---- */
+
+let picos = null;
+
+function calcularPicos(ancho) {
+  const d = muestra.buffer.getChannelData(0);
+  const paso = Math.max(1, Math.floor(d.length / ancho));
+  const out = new Float32Array(ancho);
+  for (let x = 0; x < ancho; x++) {
+    let max = 0;
+    for (let i = 0; i < paso; i++) {
+      const v = Math.abs(d[x * paso + i] || 0);
+      if (v > max) max = v;
+    }
+    out[x] = max;
+  }
+  return out;
+}
+
+function pintarOnda() {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const w = onda.clientWidth || 600, h = 150;
+  onda.width = Math.round(w * dpr);
+  onda.height = Math.round(h * dpr);
+  const g = onda.getContext('2d');
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.clearRect(0, 0, w, h);
+  g.fillStyle = '#0d1a12';
+  g.fillRect(0, 0, w, h);
+
+  if (!muestra.buffer) {
+    g.fillStyle = 'rgba(125,240,168,.5)';
+    g.font = '11px ui-monospace, monospace';
+    g.textAlign = 'center';
+    g.fillText('Abre un audio para detectar su BPM y trocearlo en 16', w / 2, h / 2);
+    return;
+  }
+
+  if (!picos || picos.length !== Math.round(w)) picos = calcularPicos(Math.round(w));
+
+  // Onda completa
+  g.strokeStyle = 'rgba(125,240,168,.4)';
+  g.beginPath();
+  for (let x = 0; x < picos.length; x++) {
+    const a = picos[x] * (h / 2 - 8);
+    g.moveTo(x, h / 2 - a);
+    g.lineTo(x, h / 2 + a);
+  }
+  g.stroke();
+
+  const X = seg => seg / muestra.buffer.duration * w;
+  const x0 = X(muestra.inicio), x1 = X(muestra.inicio + largoRegion());
+
+  // Zonas fuera de la región, atenuadas
+  g.fillStyle = 'rgba(0,0,0,.55)';
+  g.fillRect(0, 0, Math.max(0, x0), h);
+  g.fillRect(x1, 0, Math.max(0, w - x1), h);
+
+  // Cortes
+  g.strokeStyle = 'rgba(231,185,61,.55)';
+  g.fillStyle = 'rgba(231,185,61,.85)';
+  g.font = '9px ui-monospace, monospace';
+  g.textAlign = 'left';
+  muestra.cortes.forEach((c, i) => {
+    const x = X(c.offset);
+    g.beginPath();
+    g.moveTo(x, 0);
+    g.lineTo(x, h);
+    g.lineWidth = i % 4 === 0 ? 1.6 : 0.7;
+    g.stroke();
+    if (i % 4 === 0) g.fillText(String(i + 1), x + 3, 12);
+  });
+
+  // Bordes de la región
+  g.strokeStyle = '#e7b93d';
+  g.lineWidth = 2;
+  g.beginPath();
+  g.moveTo(x0, 0); g.lineTo(x0, h);
+  g.moveTo(x1, 0); g.lineTo(x1, h);
+  g.stroke();
+
+  g.fillStyle = 'rgba(125,240,168,.75)';
+  g.textAlign = 'right';
+  g.fillText(fmt(muestra.buffer.duration, 2) + ' s', w - 6, h - 6);
+}
+
+function escucharRegion() {
+  if (!muestra.buffer) return;
+  prepararAudio().then(c => {
+    const s = c.createBufferSource();
+    s.buffer = muestra.buffer;
+    s.playbackRate.value = muestra.bpm / tempo;
+    const g = c.createGain();
+    g.gain.value = 0.9;
+    s.connect(g); g.connect(maestro);
+    s.start(c.currentTime, muestra.inicio, largoRegion());
+  });
+}
+
+/* ================= arranque ================= */
+
+construir();
+cargarPreset('house');
+seleccionarPad(0);
+pintarLcd();
+pintarOnda();
+
+/* Arrastre sobre la onda: mueve la región; un clic simple asigna el corte. */
+let arrastrando = false, movio = false;
+onda.addEventListener('pointerdown', e => {
+  if (!muestra.buffer) return;
+  onda.setPointerCapture(e.pointerId);
+  arrastrando = true; movio = false;
+  const r = onda.getBoundingClientRect();
+  const seg = (e.clientX - r.left) / r.width * muestra.buffer.duration;
+  muestra.inicio = Math.max(0, Math.min(seg, muestra.buffer.duration - largoRegion()));
+  recalcularCortes();
+});
+onda.addEventListener('pointermove', e => {
+  if (!arrastrando || !muestra.buffer) return;
+  movio = true;
+  const r = onda.getBoundingClientRect();
+  const seg = (e.clientX - r.left) / r.width * muestra.buffer.duration;
+  muestra.inicio = Math.max(0, Math.min(seg, muestra.buffer.duration - largoRegion()));
+  recalcularCortes();
+});
+onda.addEventListener('pointerup', e => {
+  arrastrando = false;
+  if (movio || !muestra.buffer) return;
+  const r = onda.getBoundingClientRect();
+  const seg = (e.clientX - r.left) / r.width * muestra.buffer.duration;
+  const i = muestra.cortes.findIndex(c => seg >= c.offset && seg < c.offset + c.dur);
+  if (i >= 0) asignarCorteAlPad(i);
+});
+
+window.addEventListener('resize', () => { picos = null; pintarOnda(); });
+
+/* Teclado: cuatro filas de cuatro pads, como en la máquina. */
+const TECLAS = ['1', '2', '3', '4', 'q', 'w', 'e', 'r', 'a', 's', 'd', 'f', 'z', 'x', 'c', 'v'];
+document.addEventListener('keydown', async e => {
+  if (e.target.matches('input, select, textarea')) return;
+  if (e.code === 'Space') { e.preventDefault(); tocando ? detener() : tocar(); return; }
+  const i = TECLAS.indexOf(e.key.toLowerCase());
+  if (i < 0 || e.repeat) return;
+  await prepararAudio();
+  seleccionarPad(i);
+  disparar(i, A.ctx().currentTime, 1);
+  padsUi[i].destellar();
+});
+</script>
+</body>
+</html>

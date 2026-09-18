@@ -1,0 +1,513 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>POLY-6 · sintetizador analógico · CODE</title>
+<meta name="description" content="Sintetizador polifónico con cuerpo de máquina: dos osciladores, filtro con envolvente propia, ADSR, osciloscopio, metrónomo con claqueta y grabación de la interpretación exportable a WAV o MP3.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20100%20100%22%3E%3Ccircle%20cx%3D%2250%22%20cy%3D%2250%22%20r%3D%2241%22%20fill%3D%22none%22%20stroke%3D%22%2523E7B93D%22%20stroke-width%3D%228%22%2F%3E%3Cg%20fill%3D%22none%22%20stroke%3D%22%2523E7B93D%22%20stroke-width%3D%225%22%20stroke-linecap%3D%22round%22%3E%3Cpath%20d%3D%22M30%2026%20L52%2048%22%2F%3E%3Cpath%20d%3D%22M24%2034%20L40%2050%20L40%2058%22%2F%3E%3Cpath%20d%3D%22M20%2044%20L30%2054%20L30%2064%22%2F%3E%3C%2Fg%3E%3Cg%20fill%3D%22%2523E7B93D%22%3E%3Ccircle%20cx%3D%2252%22%20cy%3D%2248%22%20r%3D%225.5%22%2F%3E%3Ccircle%20cx%3D%2240%22%20cy%3D%2258%22%20r%3D%225.5%22%2F%3E%3Ccircle%20cx%3D%2230%22%20cy%3D%2264%22%20r%3D%225.5%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E">
+<script>(function(){try{var t=localStorage.getItem('code-theme');if(t!=='light'&&t!=='dark'){t=matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';}document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="../assets/demo.css">
+<link rel="stylesheet" href="../assets/maquina.css">
+</head>
+<body>
+<div class="wrap">
+<header class="demo-head">
+  <a class="brand-bar" href="../index.html">
+    <svg viewBox="0 0 100 100" width="20" height="20" aria-hidden="true">
+      <circle cx="50" cy="50" r="41" fill="none" stroke="currentColor" stroke-width="7"/>
+      <g fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round">
+        <path d="M30 26 L52 48"/>
+        <path d="M24 34 L40 50 L40 58"/>
+        <path d="M20 44 L30 54 L30 64"/>
+      </g>
+      <g fill="currentColor">
+        <circle cx="52" cy="48" r="5"/>
+        <circle cx="40" cy="58" r="5"/>
+        <circle cx="30" cy="64" r="5"/>
+      </g>
+    </svg>
+    <span>CODE</span>
+  </a>
+  <span class="idx">11</span>
+  <h1>POLY-6 · sintetizador analógico</h1>
+  <div class="head-actions">
+    <button type="button" class="theme-toggle" id="themeToggle" aria-pressed="false"></button>
+    <a class="back" href="../index.html">← Portafolio</a>
+  </div>
+  <p class="sub">Sintetizador polifónico con cuerpo de máquina: dos osciladores, filtro con envolvente propia, ADSR, osciloscopio, metrónomo con claqueta y grabación de la interpretación exportable a WAV o MP3.</p>
+</header>
+<div id="maquina"></div>
+
+<section class="panel">
+  <h2>Cómo se toca</h2>
+  <div class="cols">
+    <p class="note"><strong>Teclado.</strong> Con el ratón o el dedo sobre las teclas, o con <code>z x c v b n m</code> para las naturales y <code>s d g h j</code> para las alteradas. <code>←</code> y <code>→</code> cambian de octava.</p>
+    <p class="note"><strong>Perillas.</strong> Se arrastran hacia arriba y abajo, responden a la rueda y a las flechas del teclado. Con <kbd>Shift</kbd> el ajuste es fino y un doble clic devuelve el valor de origen.</p>
+    <p class="note"><strong>Metrónomo.</strong> Marca el primer tiempo con un acento más agudo; el testigo parpadea en cada pulso.</p>
+    <p class="note"><strong>Grabación.</strong> <em>Rec</em> captura todo lo que suene por la salida, incluido el metrónomo si está encendido.</p>
+  </div>
+</section>
+<footer class="demo-foot">
+  <span>CODE · Audio y música · demo 11 de 30</span>
+  <span>Web Audio API · Síntesis sustractiva · WAV / MP3 · Canvas</span>
+</footer>
+</div>
+<script src="../assets/demo.js"></script>
+<script src="../assets/exportar.js"></script>
+<script src="../assets/audio.js"></script>
+<script src="../assets/grabar.js"></script>
+<script src="../assets/maquina.js"></script>
+<script>
+const { $, el, fmt } = CODE;
+const A = AUDIO, M = MAQUINA, G = GRABAR;
+
+/* ================= parámetros ================= */
+
+const ONDAS = ['sine', 'triangle', 'sawtooth', 'square'];
+const NOMBRE_ONDA = ['Senoidal', 'Triangular', 'Sierra', 'Cuadrada'];
+
+const P = {
+  onda1: 2, onda2: 3, mezcla: 0.4, detune: 8,
+  corte: 2400, q: 6, envFiltro: 2400,
+  ataque: 0.01, decaimiento: 0.22, sostenido: 0.55, relajacion: 0.35,
+  volumen: 0.22
+};
+
+const voces = new Map();
+let maestro = null, analizador = null, datos = null, grabadora = null;
+let octava = 3, listo = false, grabando = false, ultimaGrabacion = 0;
+
+/* metrónomo */
+let metro = false, metroBpm = 100, metroCompas = 4;
+let metroProximo = 0, metroPulso = 0, metroTemporizador = null;
+
+/* ================= audio ================= */
+
+async function prepararAudio() {
+  const c = await A.resume();
+  if (!listo) {
+    maestro = c.createGain();
+    maestro.gain.value = P.volumen;
+    analizador = c.createAnalyser();
+    analizador.fftSize = 2048;
+    datos = new Float32Array(analizador.fftSize);
+    maestro.connect(analizador);
+    analizador.connect(c.destination);
+    grabadora = G.grabadora(c, maestro);
+    listo = true;
+    btnPoder.encender(true);
+  }
+  return c;
+}
+
+function notaOn(midi) {
+  if (!listo || voces.has(midi)) return;
+  const c = A.ctx(), t = c.currentTime, f = A.notaAFrec(midi);
+
+  const filtro = c.createBiquadFilter();
+  filtro.type = 'lowpass';
+  filtro.Q.value = P.q;
+  const amp = c.createGain();
+  amp.gain.value = 0;
+
+  const oscs = [
+    Object.assign(c.createOscillator(), { type: ONDAS[Math.round(P.onda1)] }),
+    Object.assign(c.createOscillator(), { type: ONDAS[Math.round(P.onda2)] })
+  ];
+  const mez = [c.createGain(), c.createGain()];
+  mez[0].gain.value = 1 - P.mezcla;
+  mez[1].gain.value = P.mezcla;
+  oscs.forEach((o, i) => {
+    o.frequency.value = f;
+    o.detune.value = i === 1 ? P.detune : -P.detune;
+    o.connect(mez[i]); mez[i].connect(filtro);
+    o.start(t);
+  });
+  filtro.connect(amp); amp.connect(maestro);
+
+  const pico = Math.min(18000, P.corte + P.envFiltro);
+  filtro.frequency.cancelScheduledValues(t);
+  filtro.frequency.setValueAtTime(Math.min(18000, P.corte * 0.6), t);
+  filtro.frequency.linearRampToValueAtTime(pico, t + P.ataque);
+  filtro.frequency.setTargetAtTime(P.corte, t + P.ataque, Math.max(0.01, P.decaimiento / 3));
+
+  amp.gain.setValueAtTime(0, t);
+  amp.gain.linearRampToValueAtTime(1, t + P.ataque);
+  amp.gain.setTargetAtTime(P.sostenido, t + P.ataque, Math.max(0.01, P.decaimiento / 3));
+
+  voces.set(midi, { oscs, amp, filtro });
+  marcarTecla(midi, true);
+  pintarLcd();
+}
+
+function notaOff(midi) {
+  const v = voces.get(midi);
+  if (!v) return;
+  const c = A.ctx(), t = c.currentTime;
+  v.amp.gain.cancelScheduledValues(t);
+  v.amp.gain.setValueAtTime(Math.max(0.0001, v.amp.gain.value), t);
+  v.amp.gain.setTargetAtTime(0, t, Math.max(0.01, P.relajacion / 4));
+  v.oscs.forEach(o => o.stop(t + P.relajacion + 0.3));
+  voces.delete(midi);
+  marcarTecla(midi, false);
+  pintarLcd();
+}
+
+const silenciarTodo = () => Array.from(voces.keys()).forEach(notaOff);
+
+/* ================= metrónomo ================= */
+
+function clic(c, t, acento) {
+  const o = c.createOscillator();
+  o.type = 'square';
+  o.frequency.value = acento ? 1800 : 1200;
+  const g = c.createGain();
+  g.gain.setValueAtTime(0, t);
+  g.gain.linearRampToValueAtTime(acento ? 0.32 : 0.18, t + 0.002);
+  g.gain.exponentialRampToValueAtTime(0.0005, t + 0.05);
+  o.connect(g); g.connect(maestro);
+  o.start(t); o.stop(t + 0.07);
+}
+
+function relojMetro() {
+  const c = A.ctx();
+  const intervalo = 60 / metroBpm;
+  while (metroProximo < c.currentTime + 0.12) {
+    const acento = metroPulso % metroCompas === 0;
+    clic(c, metroProximo, acento);
+    const p = metroPulso;
+    setTimeout(() => {
+      ledMetro.encender(true);
+      ledMetro.luz.classList.toggle('verde', p % metroCompas === 0);
+      setTimeout(() => ledMetro.encender(false), 90);
+      pulsoVisible = p % metroCompas;
+      pintarLcd();
+    }, Math.max(0, (metroProximo - c.currentTime) * 1000));
+    metroProximo += intervalo;
+    metroPulso++;
+  }
+  metroTemporizador = setTimeout(relojMetro, 25);
+}
+
+let pulsoVisible = -1;
+
+async function alternarMetronomo(encendido) {
+  await prepararAudio();
+  metro = encendido;
+  if (metro) {
+    metroPulso = 0;
+    metroProximo = A.ctx().currentTime + 0.08;
+    relojMetro();
+  } else {
+    clearTimeout(metroTemporizador);
+    ledMetro.encender(false);
+    pulsoVisible = -1;
+  }
+  pintarLcd();
+}
+
+/* ================= grabación ================= */
+
+async function alternarGrabacion() {
+  await prepararAudio();
+  if (!grabando) {
+    grabadora.iniciar();
+    grabando = true;
+    btnRec.encender(true);
+    ledRec.encender(true);
+  } else {
+    grabadora.detener();
+    grabando = false;
+    ultimaGrabacion = grabadora.duracion;
+    btnRec.encender(false);
+    ledRec.encender(false);
+    btnWav.disabled = btnMp3.disabled = false;
+  }
+  pintarLcd();
+}
+
+async function exportarAudio(formato) {
+  if (!grabadora || grabadora.vacia) return;
+  const boton = formato === 'mp3' ? btnMp3 : btnWav;
+  const etiqueta = formato === 'mp3' ? 'MP3' : 'WAV';
+  boton.texto('…');
+  try {
+    const blob = await grabadora.exportar(formato, 192);
+    CODE.exportar.descargar('poly6-' + Date.now() + '.' + formato, blob);
+    mensaje('Exportado ' + etiqueta + ' · ' + fmt(ultimaGrabacion, 1) + ' s');
+  } catch (e) {
+    mensaje('No se pudo cargar el codificador MP3; exporta en WAV');
+  }
+  boton.texto(etiqueta);
+}
+
+let mensajeActual = '', mensajeTemporizador = null;
+function mensaje(texto) {
+  mensajeActual = texto;
+  pintarLcd();
+  clearTimeout(mensajeTemporizador);
+  mensajeTemporizador = setTimeout(() => { mensajeActual = ''; pintarLcd(); }, 4000);
+}
+
+/* ================= interfaz ================= */
+
+let pantalla, btnRec, btnWav, btnMp3, btnPoder, ledRec, ledMetro, teclado, osciloscopio, lienzoAdsr;
+
+function construir() {
+  const { maquina, panel, pie } = M.chasis({
+    marca: 'CODE',
+    modelo: 'POLY-6 · analog polysynth',
+    derecha: [(ledRec = M.led('Rec', 'rojo')), (ledMetro = M.led('Tempo'))],
+    pie: [el('span', { text: 'Seis voces · motor de audio nativo del navegador' })]
+  });
+
+  pantalla = M.lcd(104);
+
+  /* --- osciladores --- */
+  const osc = el('div.fila-perillas', null, [
+    M.perilla({ nombre: 'Onda 1', min: 0, max: 3, valor: P.onda1, paso: 1,
+      formato: v => NOMBRE_ONDA[Math.round(v)], onCambio: v => { P.onda1 = v; pintarLcd(); } }),
+    M.perilla({ nombre: 'Onda 2', min: 0, max: 3, valor: P.onda2, paso: 1,
+      formato: v => NOMBRE_ONDA[Math.round(v)], onCambio: v => { P.onda2 = v; pintarLcd(); } }),
+    M.perilla({ nombre: 'Mezcla', min: 0, max: 1, valor: P.mezcla,
+      formato: v => fmt(v * 100, 0) + ' %', onCambio: v => { P.mezcla = v; } }),
+    M.perilla({ nombre: 'Detune', min: 0, max: 40, valor: P.detune, paso: 0.5,
+      formato: v => '±' + fmt(v, 1) + ' ct', onCambio: v => { P.detune = v; } })
+  ]);
+
+  /* --- filtro --- */
+  const filtro = el('div.fila-perillas', null, [
+    M.perilla({ nombre: 'Corte', min: 120, max: 12000, valor: P.corte, log: true,
+      formato: v => v >= 1000 ? fmt(v / 1000, 2) + ' kHz' : fmt(v, 0) + ' Hz',
+      onCambio: v => { P.corte = v; } }),
+    M.perilla({ nombre: 'Resonancia', min: 0.1, max: 20, valor: P.q,
+      formato: v => fmt(v, 1), onCambio: v => { P.q = v; } }),
+    M.perilla({ nombre: 'Env filtro', min: 0, max: 8000, valor: P.envFiltro, paso: 10,
+      formato: v => '+' + fmt(v, 0) + ' Hz', onCambio: v => { P.envFiltro = v; } })
+  ]);
+
+  /* --- envolvente --- */
+  lienzoAdsr = el('canvas.pantalla', { height: 96, style: 'height:96px;margin-top:10px' });
+  const adsr = el('div.fila-perillas', null, [
+    M.perilla({ nombre: 'Ataque', min: 0.001, max: 1.5, valor: P.ataque, log: true, chica: true,
+      formato: v => fmt(v * 1000, 0) + ' ms', onCambio: v => { P.ataque = v; dibujarAdsr(); } }),
+    M.perilla({ nombre: 'Caída', min: 0.01, max: 2, valor: P.decaimiento, log: true, chica: true,
+      formato: v => fmt(v * 1000, 0) + ' ms', onCambio: v => { P.decaimiento = v; dibujarAdsr(); } }),
+    M.perilla({ nombre: 'Sostenido', min: 0, max: 1, valor: P.sostenido, chica: true,
+      formato: v => fmt(v * 100, 0) + ' %', onCambio: v => { P.sostenido = v; dibujarAdsr(); } }),
+    M.perilla({ nombre: 'Relajación', min: 0.01, max: 3, valor: P.relajacion, log: true, chica: true,
+      formato: v => fmt(v * 1000, 0) + ' ms', onCambio: v => { P.relajacion = v; dibujarAdsr(); } })
+  ]);
+
+  /* --- metrónomo y grabación --- */
+  const metronomo = el('div.fila-perillas', null, [
+    M.perilla({ nombre: 'Tempo', min: 40, max: 208, valor: metroBpm, paso: 1,
+      formato: v => fmt(v, 0) + ' BPM', onCambio: v => { metroBpm = v; pintarLcd(); } }),
+    M.perilla({ nombre: 'Compás', min: 2, max: 7, valor: metroCompas, paso: 1,
+      formato: v => fmt(v, 0) + '/4', onCambio: v => { metroCompas = Math.round(v); pintarLcd(); } }),
+    M.perilla({ nombre: 'Volumen', min: 0, max: 0.6, valor: P.volumen,
+      formato: v => fmt(v / 0.6 * 100, 0) + ' %',
+      onCambio: v => { P.volumen = v; if (maestro) maestro.gain.value = v; } })
+  ]);
+
+  const botonesMetro = el('div.fila-botones', { style: 'margin-top:12px' }, [
+    M.boton({ texto: 'Metrónomo', alternar: true, onClick: alternarMetronomo }),
+    (btnRec = M.boton({ texto: '● Rec', pie: 'graba la salida', onClick: alternarGrabacion })),
+    (btnWav = M.boton({ texto: 'WAV', onClick: () => exportarAudio('wav') })),
+    (btnMp3 = M.boton({ texto: 'MP3', pie: '192 kbps', onClick: () => exportarAudio('mp3') }))
+  ]);
+  btnWav.disabled = btnMp3.disabled = true;
+
+  /* --- transporte --- */
+  const transporte = el('div.fila-botones', null, [
+    (btnPoder = M.boton({ texto: 'Power', pie: 'activa el audio', onClick: prepararAudio })),
+    M.boton({ texto: 'Octava −', onClick: () => cambiarOctava(-1) }),
+    M.boton({ texto: 'Octava +', onClick: () => cambiarOctava(1) }),
+    M.boton({ texto: 'Panic', pie: 'corta las voces', onClick: silenciarTodo })
+  ]);
+
+  osciloscopio = el('canvas.pantalla', { height: 118, style: 'height:118px' });
+
+  panel.appendChild(M.modulo('Consola', [pantalla, el('div', { style: 'height:12px' }), transporte], 'sp4'));
+  panel.appendChild(M.modulo('Osciladores', osc, 'sp4'));
+  panel.appendChild(M.modulo('Filtro', filtro, 'sp4'));
+  panel.appendChild(M.modulo('Envolvente', [adsr, lienzoAdsr], 'sp4'));
+  panel.appendChild(M.modulo('Metrónomo y grabación', [metronomo, botonesMetro], 'sp5'));
+  panel.appendChild(M.modulo('Osciloscopio', osciloscopio, 'sp3'));
+
+  teclado = el('div.teclado', { role: 'group', 'aria-label': 'Teclado del sintetizador' });
+  maquina.querySelector('.maquina-cuerpo').insertBefore(teclado, maquina.querySelector('.maquina-pie'));
+
+  $('#maquina').appendChild(maquina);
+}
+
+/* ---- teclado ---- */
+
+const NEGRAS = [1, 3, 6, 8, 10];
+const BLANCAS_VISIBLES = 15;
+
+function pintarTeclado() {
+  teclado.textContent = '';
+  const base = 12 * (octava + 1);
+  const teclas = [];
+  let blancas = 0;
+  for (let i = 0; i < 26 && blancas < BLANCAS_VISIBLES; i++) {
+    const midi = base + i;
+    const negra = NEGRAS.includes(midi % 12);
+    teclas.push({ midi, negra, pos: blancas });
+    if (!negra) blancas++;
+  }
+  const ancho = 100 / BLANCAS_VISIBLES;
+
+  const crear = t => {
+    const b = el('button.tecla' + (t.negra ? '.negra' : '.blanca'), {
+      type: 'button', 'data-midi': t.midi,
+      'aria-label': A.nombreNota(t.midi),
+      style: t.negra
+        ? `left:${(t.pos * ancho - ancho * 0.29).toFixed(3)}%;width:${(ancho * 0.58).toFixed(3)}%`
+        : `left:${(t.pos * ancho).toFixed(3)}%;width:${ancho.toFixed(3)}%`
+    });
+    if (!t.negra && t.midi % 12 === 0) b.textContent = A.nombreNota(t.midi);
+    const on = e => { e.preventDefault(); prepararAudio().then(() => notaOn(t.midi)); };
+    const off = () => notaOff(t.midi);
+    b.addEventListener('pointerdown', on);
+    b.addEventListener('pointerup', off);
+    b.addEventListener('pointerleave', off);
+    b.addEventListener('pointercancel', off);
+    b.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') on(e); });
+    b.addEventListener('keyup', off);
+    return b;
+  };
+  teclas.filter(t => !t.negra).forEach(t => teclado.appendChild(crear(t)));
+  teclas.filter(t => t.negra).forEach(t => teclado.appendChild(crear(t)));
+}
+
+function marcarTecla(midi, sonando) {
+  const k = teclado.querySelector('[data-midi="' + midi + '"]');
+  if (k) k.classList.toggle('sonando', sonando);
+}
+
+function cambiarOctava(d) {
+  octava = Math.max(0, Math.min(7, octava + d));
+  silenciarTodo();
+  pintarTeclado();
+  pintarLcd();
+}
+
+/* ---- pantalla ---- */
+
+function pintarLcd() {
+  const notas = Array.from(voces.keys()).sort((a, b) => a - b).map(A.nombreNota);
+  pantalla.escribir(
+    '<div class="fila"><span class="grande">' + (notas[0] || '—') + '</span>' +
+    '<span class="tenue">' + voces.size + (voces.size === 1 ? ' voz' : ' voces') + '</span></div>' +
+    '<div class="fila"><span class="tenue">Octava C' + octava + '</span>' +
+    '<span class="tenue">' + NOMBRE_ONDA[Math.round(P.onda1)] + ' + ' + NOMBRE_ONDA[Math.round(P.onda2)] + '</span></div>' +
+    '<div class="fila"><span class="tenue">' + (metro ? 'Metrónomo ' + fmt(metroBpm, 0) + ' · ' + metroCompas + '/4' : 'Metrónomo apagado') + '</span>' +
+    '<span class="tenue">' + (metro && pulsoVisible >= 0 ? '●'.repeat(pulsoVisible + 1) + '·'.repeat(Math.max(0, metroCompas - pulsoVisible - 1)) : '') + '</span></div>' +
+    (notas.length > 1 ? '<div class="fila"><span>' + notas.join(' ') + '</span></div>' : '') +
+    (grabando ? '<div class="fila"><span>● GRABANDO</span><span class="tenue">' + fmt(grabadora.duracion, 1) + ' s</span></div>'
+      : ultimaGrabacion ? '<div class="fila"><span class="tenue">última toma</span><span class="tenue">' + fmt(ultimaGrabacion, 1) + ' s</span></div>' : '') +
+    (mensajeActual ? '<div style="margin-top:4px">' + mensajeActual + '</div>' : '')
+  );
+}
+
+/* ---- dibujos ---- */
+
+function lienzo(canvas, alto) {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const w = canvas.clientWidth || 300;
+  canvas.width = Math.round(w * dpr);
+  canvas.height = Math.round(alto * dpr);
+  const g = canvas.getContext('2d');
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.clearRect(0, 0, w, alto);
+  g.fillStyle = '#0d1a12';
+  g.fillRect(0, 0, w, alto);
+  return { g, w, h: alto };
+}
+
+function dibujarAdsr() {
+  const { g, w, h } = lienzo(lienzoAdsr, 96);
+  const pad = 10;
+  const total = P.ataque + P.decaimiento + 0.5 + P.relajacion;
+  const X = s => pad + s / total * (w - 2 * pad);
+  const Y = v => h - pad - v * (h - 2 * pad);
+
+  g.strokeStyle = 'rgba(125,240,168,.18)';
+  g.lineWidth = 1;
+  for (let i = 1; i < 4; i++) {
+    g.beginPath(); g.moveTo(pad, Y(i / 4)); g.lineTo(w - pad, Y(i / 4)); g.stroke();
+  }
+
+  g.beginPath();
+  g.moveTo(X(0), Y(0));
+  g.lineTo(X(P.ataque), Y(1));
+  g.lineTo(X(P.ataque + P.decaimiento), Y(P.sostenido));
+  g.lineTo(X(P.ataque + P.decaimiento + 0.5), Y(P.sostenido));
+  g.lineTo(X(total), Y(0));
+  g.strokeStyle = '#e7b93d';
+  g.lineWidth = 2;
+  g.stroke();
+  g.lineTo(X(total), Y(0));
+  g.lineTo(X(0), Y(0));
+  g.closePath();
+  g.fillStyle = 'rgba(231,185,61,.16)';
+  g.fill();
+}
+
+function osciloscopioLoop() {
+  const { g, w, h } = lienzo(osciloscopio, 118);
+  g.strokeStyle = 'rgba(125,240,168,.2)';
+  g.beginPath(); g.moveTo(0, h / 2); g.lineTo(w, h / 2); g.stroke();
+
+  if (analizador) {
+    analizador.getFloatTimeDomainData(datos);
+    g.beginPath();
+    for (let i = 0; i < datos.length; i++) {
+      const x = i / datos.length * w;
+      const y = h / 2 - datos[i] * h * 0.45;
+      i ? g.lineTo(x, y) : g.moveTo(x, y);
+    }
+    g.strokeStyle = '#7df0a8';
+    g.lineWidth = 1.6;
+    g.stroke();
+  } else {
+    g.fillStyle = 'rgba(125,240,168,.55)';
+    g.font = '10px ui-monospace, monospace';
+    g.textAlign = 'center';
+    g.fillText('Pulsa Power y toca una nota', w / 2, h / 2 - 6);
+  }
+  if (grabando) pintarLcd();
+  requestAnimationFrame(osciloscopioLoop);
+}
+
+/* ================= arranque ================= */
+
+construir();
+pintarTeclado();
+pintarLcd();
+dibujarAdsr();
+osciloscopioLoop();
+window.addEventListener('resize', dibujarAdsr);
+
+const MAPA = { z: 0, s: 1, x: 2, d: 3, c: 4, v: 5, g: 6, b: 7, h: 8, n: 9, j: 10, m: 11, ',': 12 };
+document.addEventListener('keydown', e => {
+  if (e.repeat || e.target.matches('input, select, textarea')) return;
+  if (e.key === 'ArrowLeft') { cambiarOctava(-1); return; }
+  if (e.key === 'ArrowRight') { cambiarOctava(1); return; }
+  const k = MAPA[e.key.toLowerCase()];
+  if (k === undefined) return;
+  prepararAudio().then(() => notaOn(12 * (octava + 1) + k));
+});
+document.addEventListener('keyup', e => {
+  const k = MAPA[e.key.toLowerCase()];
+  if (k !== undefined) notaOff(12 * (octava + 1) + k);
+});
+</script>
+</body>
+</html>

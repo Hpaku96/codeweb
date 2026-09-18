@@ -1,0 +1,191 @@
+<!--meta
+{
+  "id": "06",
+  "title": "Conversor de unidades de ingeniería",
+  "tagline": "Doce magnitudes con todas sus unidades resueltas a la vez: escribe un valor y la tabla completa se actualiza, incluida la conversión afín de temperatura.",
+  "area": "ingenieria",
+  "stack": ["JavaScript", "Notación científica", "UI"],
+  "highlights": [
+    "Tabla completa en vivo en lugar de una conversión puntual de A a B",
+    "Temperatura resuelta con transformación afín, no con un simple factor",
+    "Formato adaptativo: decimales o notación científica según la magnitud"
+  ],
+  "narrow": false
+}
+-->
+
+<div class="row" style="margin-bottom:16px" id="cats"></div>
+
+<div class="cols-2">
+  <section class="panel">
+    <h2>Valor de entrada</h2>
+    <div class="field">
+      <label for="val">Cantidad</label>
+      <input type="number" id="val" value="1" step="any">
+    </div>
+    <div class="field" style="margin-top:12px">
+      <label for="uni">Unidad</label>
+      <select id="uni"></select>
+    </div>
+    <div class="readout hi" style="margin-top:16px">
+      <span class="k" id="baseK">En unidad base SI</span>
+      <span class="v" id="baseV">—</span>
+    </div>
+    <div id="atajos" class="stack" style="margin-top:16px"></div>
+  </section>
+
+  <section class="panel">
+    <h2>Equivalencias</h2>
+    <div class="tablewrap" style="max-height:520px;overflow-y:auto">
+      <table><thead><tr><th>Unidad</th><th class="num">Valor</th><th>Símbolo</th></tr></thead><tbody id="tabla"></tbody></table>
+    </div>
+    <p class="note" style="margin-top:12px">Pulsa una fila para tomar ese valor como nueva entrada.</p>
+  </section>
+</div>
+
+<script>
+const { $, el, num, fmt } = CODE;
+
+/* factor = cuántas unidades base equivale 1 de esta unidad */
+const CAT = {
+  longitud: { base: 'm', unidades: [
+    ['Milímetro', 'mm', 0.001], ['Centímetro', 'cm', 0.01], ['Metro', 'm', 1], ['Kilómetro', 'km', 1000],
+    ['Pulgada', 'in', 0.0254], ['Pie', 'ft', 0.3048], ['Yarda', 'yd', 0.9144], ['Milla', 'mi', 1609.344]
+  ]},
+  area: { base: 'm²', unidades: [
+    ['Centímetro cuadrado', 'cm²', 1e-4], ['Metro cuadrado', 'm²', 1], ['Hectárea', 'ha', 1e4],
+    ['Kilómetro cuadrado', 'km²', 1e6], ['Pulgada cuadrada', 'in²', 6.4516e-4], ['Pie cuadrado', 'ft²', 0.09290304],
+    ['Acre', 'acre', 4046.8564]
+  ]},
+  volumen: { base: 'm³', unidades: [
+    ['Mililitro', 'mL', 1e-6], ['Litro', 'L', 0.001], ['Metro cúbico', 'm³', 1],
+    ['Pie cúbico', 'ft³', 0.028316846], ['Galón EE. UU.', 'gal', 0.0037854118],
+    ['Bolsa de cemento (42.5 kg suelto)', 'bolsa', 0.0283], ['Buggy de obra', 'buggy', 0.06]
+  ]},
+  masa: { base: 'kg', unidades: [
+    ['Gramo', 'g', 0.001], ['Kilogramo', 'kg', 1], ['Tonelada métrica', 't', 1000],
+    ['Libra', 'lb', 0.45359237], ['Onza', 'oz', 0.028349523], ['Bolsa de cemento', 'bolsa', 42.5]
+  ]},
+  fuerza: { base: 'N', unidades: [
+    ['Newton', 'N', 1], ['Kilonewton', 'kN', 1000], ['Kilogramo-fuerza', 'kgf', 9.80665],
+    ['Tonelada-fuerza', 'tf', 9806.65], ['Libra-fuerza', 'lbf', 4.4482216], ['Kip', 'kip', 4448.2216]
+  ]},
+  presion: { base: 'Pa', unidades: [
+    ['Pascal', 'Pa', 1], ['Kilopascal', 'kPa', 1000], ['Megapascal', 'MPa', 1e6],
+    ['kg/cm²', 'kg/cm²', 98066.5], ['Bar', 'bar', 1e5], ['Atmósfera', 'atm', 101325],
+    ['psi', 'psi', 6894.757], ['ksi', 'ksi', 6894757], ['Metro de columna de agua', 'mca', 9806.65]
+  ]},
+  caudal: { base: 'm³/s', unidades: [
+    ['Litro por segundo', 'L/s', 0.001], ['Metro cúbico por hora', 'm³/h', 1 / 3600],
+    ['Metro cúbico por segundo', 'm³/s', 1], ['Galón por minuto', 'gpm', 6.30902e-5],
+    ['Litro por minuto', 'L/min', 1 / 60000]
+  ]},
+  densidad: { base: 'kg/m³', unidades: [
+    ['Kilogramo por metro cúbico', 'kg/m³', 1], ['Gramo por centímetro cúbico', 'g/cm³', 1000],
+    ['Tonelada por metro cúbico', 't/m³', 1000], ['Libra por pie cúbico', 'lb/ft³', 16.018463]
+  ]},
+  momento: { base: 'N·m', unidades: [
+    ['Newton metro', 'N·m', 1], ['Kilonewton metro', 'kN·m', 1000],
+    ['Kilogramo-fuerza metro', 'kgf·m', 9.80665], ['Tonelada-fuerza metro', 'tf·m', 9806.65],
+    ['Libra-fuerza pie', 'lbf·ft', 1.3558179]
+  ]},
+  energia: { base: 'J', unidades: [
+    ['Julio', 'J', 1], ['Kilojulio', 'kJ', 1000], ['Kilovatio hora', 'kWh', 3.6e6],
+    ['Caloría', 'cal', 4.184], ['Kilocaloría', 'kcal', 4184], ['BTU', 'BTU', 1055.056]
+  ]},
+  potencia: { base: 'W', unidades: [
+    ['Vatio', 'W', 1], ['Kilovatio', 'kW', 1000], ['Caballo de fuerza', 'HP', 745.699872],
+    ['Caballo de vapor', 'CV', 735.49875], ['BTU por hora', 'BTU/h', 0.29307107]
+  ]},
+  temperatura: { base: '°C', afin: true, unidades: [
+    ['Celsius', '°C', [1, 0]], ['Fahrenheit', '°F', [5 / 9, -32 * 5 / 9]], ['Kelvin', 'K', [1, -273.15]],
+    ['Rankine', '°R', [5 / 9, -273.15]]
+  ]}
+};
+
+const NOMBRES = {
+  longitud: 'Longitud', area: 'Área', volumen: 'Volumen', masa: 'Masa', fuerza: 'Fuerza',
+  presion: 'Presión y esfuerzo', caudal: 'Caudal', densidad: 'Densidad', momento: 'Momento',
+  energia: 'Energía', potencia: 'Potencia', temperatura: 'Temperatura'
+};
+
+const ATAJOS = {
+  presion: [['f\'c 210 kg/cm²', 210, 'kg/cm²'], ['Acero fy 4200 kg/cm²', 4200, 'kg/cm²'], ['Concreto 28 MPa', 28, 'MPa']],
+  longitud: [['Varilla de 1/2"', 0.5, 'in'], ['Tramo de 6 m', 6, 'm']],
+  volumen: [['Un cubo de 1 m³', 1, 'm³'], ['Un buggy', 1, 'buggy']],
+  fuerza: [['Eje equivalente 8.2 t', 8.2, 'tf']]
+};
+
+let cat = 'presion';
+
+const aBase = (v, u) => CAT[cat].afin ? v * u[2][0] + u[2][1] : v * u[2];
+const deBase = (b, u) => CAT[cat].afin ? (b - u[2][1]) / u[2][0] : b / u[2];
+
+function formatear(v) {
+  if (!Number.isFinite(v)) return '—';
+  const a = Math.abs(v);
+  if (a !== 0 && (a < 1e-4 || a >= 1e7)) return v.toExponential(4).replace('e', ' × 10^').replace('+', '');
+  return fmt(v, a >= 1000 ? 2 : a >= 1 ? 4 : 6);
+}
+
+function pintarCategorias() {
+  const cont = $('#cats'); cont.textContent = '';
+  const seg = el('div.seg');
+  Object.keys(CAT).forEach(k => {
+    const b = el('button', { text: NOMBRES[k], 'aria-pressed': String(k === cat) });
+    b.addEventListener('click', () => { cat = k; pintarCategorias(); pintarUnidades(); calcular(); });
+    seg.appendChild(b);
+  });
+  seg.style.flexWrap = 'wrap';
+  cont.appendChild(seg);
+}
+
+function pintarUnidades() {
+  const sel = $('#uni'); sel.textContent = '';
+  CAT[cat].unidades.forEach((u, i) => sel.appendChild(el('option', { value: i, text: u[0] + ' (' + u[1] + ')' })));
+  sel.value = Math.min(sel.value || 0, CAT[cat].unidades.length - 1);
+  $('#baseK').textContent = 'En unidad base — ' + CAT[cat].base;
+
+  const at = $('#atajos'); at.textContent = '';
+  (ATAJOS[cat] || []).forEach(([txt, v, sym]) => {
+    const idx = CAT[cat].unidades.findIndex(u => u[1] === sym);
+    at.appendChild(el('button.sm', { text: txt, onclick: () => { $('#val').value = v; $('#uni').value = idx; calcular(); } }));
+  });
+}
+
+function calcular() {
+  const v = num($('#val').value, 0);
+  const u = CAT[cat].unidades[+$('#uni').value] || CAT[cat].unidades[0];
+  const base = aBase(v, u);
+  $('#baseV').textContent = formatear(base);
+
+  const tb = $('#tabla'); tb.textContent = '';
+  CAT[cat].unidades.forEach((x, i) => {
+    const val = deBase(base, x);
+    const tr = el('tr', { tabindex: '0', style: 'cursor:pointer' }, [
+      el('td', { text: x[0], style: 'white-space:normal' }),
+      el('td.num', { text: formatear(val) }),
+      el('td', { text: x[1] })
+    ]);
+    if (x[1] === u[1]) tr.style.background = 'var(--accent-soft)';
+    const tomar = () => { $('#val').value = Number(val.toPrecision(10)); $('#uni').value = i; calcular(); };
+    tr.addEventListener('click', tomar);
+    tr.addEventListener('keydown', e => { if (e.key === 'Enter') tomar(); });
+    tb.appendChild(tr);
+  });
+}
+
+['#val', '#uni'].forEach(s => $(s).addEventListener('input', calcular));
+pintarCategorias(); pintarUnidades(); calcular();
+
+/* ---- exportación de resultados ---- */
+const X = CODE.exportar;
+X.registrar(() => ({
+  titulo: 'Conversión de unidades · ' + NOMBRES[cat],
+  subtitulo: $('#val').value + ' ' + (CAT[cat].unidades[+$('#uni').value] || [])[1],
+  resumen: X.desdeReadouts(),
+  tablas: [X.desdeTbody('#tabla', ['Unidad', 'Valor', 'Símbolo'], 'Equivalencias')],
+  nota: 'La temperatura se convierte con una transformación afín; el resto, por factor respecto a la unidad base del SI.'
+}));
+
+</script>

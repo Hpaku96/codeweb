@@ -1,0 +1,547 @@
+[
+  {
+    "id": "01",
+    "title": "Diseño de pavimento flexible AASHTO 93",
+    "tagline": "Resuelve el número estructural requerido por la ecuación AASHTO 93 y verifica si el paquete de capas propuesto lo cubre.",
+    "area": "ingenieria",
+    "areaLabel": "Ingeniería",
+    "stack": [
+      "JavaScript",
+      "SVG",
+      "Método numérico"
+    ],
+    "highlights": [
+      "Resolución de la ecuación AASHTO 93 por bisección (no hay despeje algebraico de SN)",
+      "Verificación capa por capa con coeficientes estructurales y de drenaje",
+      "Curva SN requerido vs. ejes equivalentes con el punto de diseño marcado"
+    ],
+    "file": "demos/01-pavimento-aashto.html"
+  },
+  {
+    "id": "02",
+    "title": "Análisis granulométrico y clasificación de suelos",
+    "tagline": "Del peso retenido en cada tamiz a la curva granulométrica, los diámetros característicos y la doble clasificación SUCS y AASHTO con índice de grupo.",
+    "area": "ingenieria",
+    "areaLabel": "Ingeniería",
+    "stack": [
+      "JavaScript",
+      "SVG log",
+      "SUCS / AASHTO"
+    ],
+    "highlights": [
+      "Interpolación logarítmica de D10, D30 y D60 sobre la curva real",
+      "Clasificación SUCS con símbolo doble en la franja 5–12 % de finos",
+      "Índice de grupo AASHTO calculado con la fórmula completa"
+    ],
+    "file": "demos/02-granulometria.html"
+  },
+  {
+    "id": "03",
+    "title": "Diagramas de cortante y momento",
+    "tagline": "Arma una viga con cargas puntuales y distribuidas y obtén reacciones, diagramas V y M, los valores máximos y el módulo de sección requerido.",
+    "area": "ingenieria",
+    "areaLabel": "Ingeniería",
+    "stack": [
+      "JavaScript",
+      "SVG",
+      "Estática"
+    ],
+    "highlights": [
+      "Integración numérica de V(x) y M(x) sobre 600 estaciones",
+      "Viga simplemente apoyada y voladizo con el mismo motor de cálculo",
+      "Esquema de la viga dibujado a escala con las cargas en su posición real"
+    ],
+    "file": "demos/03-vigas-diagramas.html"
+  },
+  {
+    "id": "04",
+    "title": "Diseño de mezcla de concreto ACI 211.1",
+    "tagline": "Dosificación completa por el método del volumen absoluto: resistencia promedio requerida, relación agua/cemento, agregados y corrección por humedad de obra.",
+    "area": "ingenieria",
+    "areaLabel": "Ingeniería",
+    "stack": [
+      "JavaScript",
+      "SVG",
+      "ACI 211.1"
+    ],
+    "highlights": [
+      "Tablas ACI interpoladas por asentamiento, tamaño máximo nominal y módulo de fineza",
+      "Arena calculada por diferencia de volúmenes absolutos, no por regla de dedo",
+      "Corrección por humedad y absorción que devuelve la dosificación real de tolva"
+    ],
+    "file": "demos/04-mezcla-concreto.html"
+  },
+  {
+    "id": "05",
+    "title": "Proctor modificado y ensayo CBR",
+    "tagline": "Ajusta la parábola de compactación para hallar la densidad máxima y el óptimo contenido de humedad, y calcula el CBR al 0.1\" y 0.2\" de penetración.",
+    "area": "ingenieria",
+    "areaLabel": "Ingeniería",
+    "stack": [
+      "JavaScript",
+      "Mínimos cuadrados",
+      "SVG"
+    ],
+    "highlights": [
+      "Ajuste cuadrático por mínimos cuadrados y vértice analítico de la parábola",
+      "Curva de saturación (cero vacíos de aire) trazada sobre los puntos del ensayo",
+      "Doble lectura de CBR con la advertencia cuando 0.2\" supera a 0.1\""
+    ],
+    "file": "demos/05-proctor-cbr.html"
+  },
+  {
+    "id": "06",
+    "title": "Conversor de unidades de ingeniería",
+    "tagline": "Doce magnitudes con todas sus unidades resueltas a la vez: escribe un valor y la tabla completa se actualiza, incluida la conversión afín de temperatura.",
+    "area": "ingenieria",
+    "areaLabel": "Ingeniería",
+    "stack": [
+      "JavaScript",
+      "Notación científica",
+      "UI"
+    ],
+    "highlights": [
+      "Tabla completa en vivo en lugar de una conversión puntual de A a B",
+      "Temperatura resuelta con transformación afín, no con un simple factor",
+      "Formato adaptativo: decimales o notación científica según la magnitud"
+    ],
+    "file": "demos/06-conversor-unidades.html"
+  },
+  {
+    "id": "07",
+    "title": "Presupuesto de obra con análisis de precios unitarios",
+    "tagline": "Cuatro partidas con su APU editable: rendimiento y cuadrilla definen la mano de obra, y el resumen arma costo directo, gastos generales, utilidad e IGV.",
+    "area": "ingenieria",
+    "areaLabel": "Ingeniería",
+    "stack": [
+      "JavaScript",
+      "Maestro-detalle",
+      "SVG"
+    ],
+    "highlights": [
+      "Mano de obra derivada de cuadrilla y rendimiento (cant = cuadrilla × 8 / rendimiento), como en un APU real",
+      "Herramientas manuales calculadas como porcentaje del subtotal de mano de obra",
+      "Incidencia de cada partida sobre el costo directo, recalculada al editar cualquier insumo"
+    ],
+    "file": "demos/07-presupuesto-obra.html"
+  },
+  {
+    "id": "08",
+    "title": "Cierre y compensación de poligonal",
+    "tagline": "Azimut y distancia de cada lado se convierten en coordenadas, se mide el error de cierre, se compensa por el método de la brújula y se calcula el área por Gauss.",
+    "area": "ingenieria",
+    "areaLabel": "Ingeniería",
+    "stack": [
+      "JavaScript",
+      "Trigonometría",
+      "SVG"
+    ],
+    "highlights": [
+      "Compensación de Bowditch repartiendo el error en proporción a la longitud de cada lado",
+      "Área por la fórmula de Gauss sobre las coordenadas ya compensadas",
+      "Dibujo a escala de la poligonal con el error de cierre marcado"
+    ],
+    "file": "demos/08-poligonal-topografia.html"
+  },
+  {
+    "id": "09",
+    "title": "EQ-5 · ecualizador paramétrico",
+    "tagline": "Cinco filtros biquad en serie sobre un panel de perillas, con la curva de respuesta calculada en vivo, el espectro de la señal procesada superpuesto y grabación de la salida en WAV o MP3.",
+    "area": "audio",
+    "areaLabel": "Audio y música",
+    "stack": [
+      "Web Audio API",
+      "Canvas",
+      "DSP",
+      "WAV / MP3"
+    ],
+    "highlights": [
+      "Respuesta combinada obtenida con getFrequencyResponse de cada biquad, no dibujada a ojo",
+      "Analizador FFT superpuesto sobre la misma escala logarítmica de la curva",
+      "Acepta un archivo de audio del usuario y lo procesa por la misma cadena"
+    ],
+    "file": "demos/09-ecualizador-parametrico.html"
+  },
+  {
+    "id": "10",
+    "title": "COMP-1 · compresor de dinámica",
+    "tagline": "Umbral, ratio, rodilla, ataque y relajación en perillas, sobre una curva de transferencia dibujada con la misma fórmula del compresor, con medidores de entrada, salida y reducción de ganancia.",
+    "area": "audio",
+    "areaLabel": "Audio y música",
+    "stack": [
+      "Web Audio API",
+      "Canvas",
+      "Dinámica",
+      "WAV / MP3"
+    ],
+    "highlights": [
+      "Curva de transferencia con rodilla suave calculada, no aproximada",
+      "Punto de operación móvil sobre la curva según el nivel instantáneo de entrada",
+      "Medidores RMS de entrada y salida junto a la reducción de ganancia"
+    ],
+    "file": "demos/10-compresor-dinamico.html"
+  },
+  {
+    "id": "11",
+    "title": "POLY-6 · sintetizador analógico",
+    "tagline": "Sintetizador polifónico con cuerpo de máquina: dos osciladores, filtro con envolvente propia, ADSR, osciloscopio, metrónomo con claqueta y grabación de la interpretación exportable a WAV o MP3.",
+    "area": "audio",
+    "areaLabel": "Audio y música",
+    "stack": [
+      "Web Audio API",
+      "Síntesis sustractiva",
+      "WAV / MP3",
+      "Canvas"
+    ],
+    "highlights": [
+      "Gestión de voces por nota MIDI con liberación limpia: se sueltan sin chasquido",
+      "Metrónomo planificado sobre el reloj de audio, no sobre temporizadores de la interfaz",
+      "Graba lo que tocas y lo exporta a WAV escrito a mano o a MP3"
+    ],
+    "file": "demos/11-sintetizador-polifonico.html"
+  },
+  {
+    "id": "12",
+    "title": "MPC-16 · caja de ritmos con samples",
+    "tagline": "Máquina de 16 pads: voces sintetizadas de fábrica, carga de tus propios samples, secuenciador de 16 pasos, grabación de la sesión y exportación a WAV o MP3. Make a Sample detecta el BPM de un audio, lo sincroniza al tempo y lo parte en 16 cortes exactos.",
+    "area": "audio",
+    "areaLabel": "Audio y música",
+    "stack": [
+      "Web Audio API",
+      "Detección de BPM",
+      "WAV / MP3",
+      "Canvas"
+    ],
+    "highlights": [
+      "Make a Sample: autocorrelación de la envolvente para hallar el BPM, ajuste de velocidad al tempo de la máquina y corte en 16 tiempos exactos",
+      "Planificador con ventana de anticipación: el tempo no depende del hilo de la interfaz",
+      "Grabación de la salida maestra y exportación a WAV escrito a mano, o a MP3 con el codificador cargado solo al pedirlo"
+    ],
+    "file": "demos/12-caja-de-ritmos.html"
+  },
+  {
+    "id": "13",
+    "title": "SPECTRA · analizador y medidor de sonoridad",
+    "tagline": "Unidad de medición con FFT en escala logarítmica, espectrograma en cascada y sonoridad momentánea en LUFS con la ponderación K de la norma ITU-R BS.1770.",
+    "area": "audio",
+    "areaLabel": "Audio y música",
+    "stack": [
+      "Web Audio API",
+      "Canvas",
+      "ITU-R BS.1770"
+    ],
+    "highlights": [
+      "Ponderación K implementada con los dos biquads de la norma, no con una curva inventada",
+      "Espectrograma dibujado desplazando el propio lienzo, sin acumular memoria",
+      "Detección del pico espectral con su nota musical más cercana"
+    ],
+    "file": "demos/13-analizador-espectro.html"
+  },
+  {
+    "id": "14",
+    "title": "SPACE-2 · delay y reverb",
+    "tagline": "Procesador de espacio con delay ping-pong sincronizado al tempo, filtro dentro del lazo de realimentación y reverb de convolución sobre una respuesta al impulso generada al vuelo. Graba y exporta el resultado.",
+    "area": "audio",
+    "areaLabel": "Audio y música",
+    "stack": [
+      "Web Audio API",
+      "Convolución",
+      "Canvas",
+      "WAV / MP3"
+    ],
+    "highlights": [
+      "Respuesta al impulso sintetizada y regenerada al mover tamaño, decaimiento o brillo",
+      "Delay ping-pong construido con dos líneas cruzadas y filtro dentro del lazo",
+      "Tiempo de delay sincronizado a figuras musicales, incluida la corchea con puntillo"
+    ],
+    "file": "demos/14-delay-reverb.html"
+  },
+  {
+    "id": "15",
+    "title": "Catálogo de precios y cotizador",
+    "tagline": "Catálogo filtrable de 24 productos con precio por escala de volumen, carrito de cotización, descuento por monto, IGV y documento listo para imprimir o enviar.",
+    "area": "negocio",
+    "areaLabel": "Negocio y comercio",
+    "stack": [
+      "JavaScript",
+      "Estado en memoria",
+      "Impresión"
+    ],
+    "highlights": [
+      "Precio resuelto por escala: la misma línea cambia de tarifa al cruzar 10 y 50 unidades",
+      "Búsqueda combinada con filtros de línea y marca sin recargar nada",
+      "Cotización imprimible generada desde el mismo estado del carrito"
+    ],
+    "file": "demos/15-catalogo-cotizador.html"
+  },
+  {
+    "id": "16",
+    "title": "CRM de cartera y prospectos",
+    "tagline": "Tablero de etapas con arrastrar y soltar, ficha del cliente, alerta de visita vencida según su frecuencia de compra y proyección de venta mensual de la cartera.",
+    "area": "negocio",
+    "areaLabel": "Negocio y comercio",
+    "stack": [
+      "JavaScript",
+      "Drag and Drop",
+      "Estado en memoria"
+    ],
+    "highlights": [
+      "Arrastrar y soltar nativo con alternativa por teclado y botones, no solo ratón",
+      "Alerta de visita vencida derivada de frecuencia de compra contra días sin comprar",
+      "Proyección mensual de cartera recalculada al mover un cliente de etapa"
+    ],
+    "file": "demos/16-crm-clientes.html"
+  },
+  {
+    "id": "17",
+    "title": "Optimizador de rutas de reparto",
+    "tagline": "Vecino más cercano seguido de mejora 2-opt sobre las coordenadas reales de cada cliente, con comparación contra el orden original y estimación de tiempo de jornada.",
+    "area": "negocio",
+    "areaLabel": "Negocio y comercio",
+    "stack": [
+      "JavaScript",
+      "Heurísticas TSP",
+      "SVG"
+    ],
+    "highlights": [
+      "Construcción por vecino más cercano y refinamiento 2-opt hasta que no haya mejora",
+      "Distancias por fórmula de haversine y factor de trama urbana, no en línea recta",
+      "Ahorro medido contra el orden de partida, en kilómetros y en minutos"
+    ],
+    "file": "demos/17-optimizador-rutas.html"
+  },
+  {
+    "id": "18",
+    "title": "Simulador de crédito y cronograma",
+    "tagline": "Cuota francesa o alemana, conversión de tasa efectiva anual a mensual, cronograma completo y costo total anual calculado por tasa interna de retorno sobre el flujo real.",
+    "area": "negocio",
+    "areaLabel": "Negocio y comercio",
+    "stack": [
+      "JavaScript",
+      "Matemática financiera",
+      "SVG"
+    ],
+    "highlights": [
+      "TCEA obtenida por bisección sobre el flujo de caja, incluyendo seguro y portes",
+      "Dos sistemas de amortización sobre el mismo motor de cronograma",
+      "Composición interés / amortización de cada cuota en un gráfico apilado"
+    ],
+    "file": "demos/18-simulador-credito.html"
+  },
+  {
+    "id": "19",
+    "title": "Panel de ventas de la distribuidora",
+    "tagline": "Doce meses de venta por vendedor y línea de producto: acumulados, margen, variación contra el mes anterior, estacionalidad y ranking, todo filtrable en vivo.",
+    "area": "negocio",
+    "areaLabel": "Negocio y comercio",
+    "stack": [
+      "JavaScript",
+      "SVG",
+      "Agregación de datos"
+    ],
+    "highlights": [
+      "Agregación por múltiples dimensiones sin librerías de datos",
+      "Variación mensual y participación calculadas sobre el subconjunto filtrado",
+      "Serie de margen superpuesta a la de venta en la misma escala temporal"
+    ],
+    "file": "demos/19-panel-ventas.html"
+  },
+  {
+    "id": "20",
+    "title": "Control de inventario y reposición",
+    "tagline": "Punto de reorden con stock de seguridad por nivel de servicio, lote económico de compra, días de cobertura y la orden de compra sugerida para los productos en rojo.",
+    "area": "negocio",
+    "areaLabel": "Negocio y comercio",
+    "stack": [
+      "JavaScript",
+      "Gestión de stock",
+      "SVG"
+    ],
+    "highlights": [
+      "Stock de seguridad por nivel de servicio (z) y variabilidad del plazo de entrega",
+      "Lote económico de compra sobre costo de pedido y costo de mantener inventario",
+      "Semáforo de cobertura que ordena la tabla por urgencia real, no por nombre"
+    ],
+    "file": "demos/20-control-inventario.html"
+  },
+  {
+    "id": "21",
+    "title": "Punto de venta para restaurante",
+    "tagline": "Comandas por mesa que sobreviven al cambio de mesa, carta por categorías, notas de cocina, propina configurable y cálculo de vuelto al cobrar en efectivo.",
+    "area": "negocio",
+    "areaLabel": "Negocio y comercio",
+    "stack": [
+      "JavaScript",
+      "Estado por mesa",
+      "UI táctil"
+    ],
+    "highlights": [
+      "Estado independiente por mesa: se cambia de mesa sin perder la comanda abierta",
+      "Notas por línea para cocina y control de cantidades con teclado o toque",
+      "Cierre de cuenta con división por comensales y vuelto en efectivo"
+    ],
+    "file": "demos/21-punto-de-venta.html"
+  },
+  {
+    "id": "22",
+    "title": "Márgenes, precios y punto de equilibrio",
+    "tagline": "Del costo puesto en almacén al precio de cada canal: flete, merma y comisión entran al costo real, y el gráfico muestra dónde la operación deja de perder dinero.",
+    "area": "negocio",
+    "areaLabel": "Negocio y comercio",
+    "stack": [
+      "JavaScript",
+      "Costeo",
+      "SVG"
+    ],
+    "highlights": [
+      "Distinción explícita entre margen sobre la venta y markup sobre el costo",
+      "Costo real que incorpora flete, merma y comisión antes de fijar precio",
+      "Punto de equilibrio en unidades y en soles, con la recta de utilidad trazada"
+    ],
+    "file": "demos/22-margenes-precios.html"
+  },
+  {
+    "id": "23",
+    "title": "API REST con consola de pruebas",
+    "tagline": "Un servidor REST completo corriendo en el navegador: autenticación por clave, paginación, filtros, orden, validación de cuerpo y los códigos de estado que corresponden a cada caso.",
+    "area": "backend",
+    "areaLabel": "Backend y datos",
+    "stack": [
+      "JavaScript",
+      "REST",
+      "Validación"
+    ],
+    "highlights": [
+      "Enrutador con parámetros de ruta, query string y cuerpo JSON, escrito a mano",
+      "Errores con forma consistente: código, mensaje y detalle por campo inválido",
+      "Paginación con metadatos y cabeceras de respuesta, como en un servicio real"
+    ],
+    "file": "demos/23-api-rest-consola.html"
+  },
+  {
+    "id": "24",
+    "title": "Diseñador de esquema de base de datos",
+    "tagline": "Diagrama entidad-relación arrastrable que se traduce a SQL en tres dialectos, con claves primarias, foráneas, índices y restricciones generados a partir del modelo.",
+    "area": "backend",
+    "areaLabel": "Backend y datos",
+    "stack": [
+      "JavaScript",
+      "SQL",
+      "SVG"
+    ],
+    "highlights": [
+      "Un solo modelo en memoria alimenta el diagrama y el SQL: nunca se desincronizan",
+      "Tres dialectos con sus diferencias reales de tipos y autoincremento",
+      "Relaciones dibujadas entre los campos exactos que participan en la clave foránea"
+    ],
+    "file": "demos/24-disenador-esquema.html"
+  },
+  {
+    "id": "25",
+    "title": "Motor SQL en el navegador",
+    "tagline": "Un intérprete de SELECT escrito desde cero: tokenizador, análisis descendente recursivo, JOIN, WHERE, GROUP BY con agregados, HAVING, ORDER BY y LIMIT. Sin librerías ni WebAssembly.",
+    "area": "backend",
+    "areaLabel": "Backend y datos",
+    "stack": [
+      "JavaScript",
+      "Parsers",
+      "SQL"
+    ],
+    "highlights": [
+      "Tokenizador y analizador descendente recursivo con precedencia de operadores real",
+      "Agregados evaluados sobre los grupos, con HAVING aplicado después de agrupar",
+      "El plan de ejecución se muestra tal como quedó el árbol sintáctico"
+    ],
+    "file": "demos/25-motor-sql.html"
+  },
+  {
+    "id": "26",
+    "title": "Pipeline ETL de listas de precios",
+    "tagline": "Pega la lista sucia que llegó del proveedor y mira cómo cada etapa la limpia, valida y transforma, con el registro de qué fila se cayó y por qué.",
+    "area": "backend",
+    "areaLabel": "Backend y datos",
+    "stack": [
+      "JavaScript",
+      "ETL",
+      "Validación"
+    ],
+    "highlights": [
+      "Analizador de CSV que respeta comillas, separadores mixtos y decimales con coma",
+      "Cada etapa informa cuántas filas entraron, salieron y se rechazaron",
+      "Salida en tres formatos: tabla limpia, JSON e INSERT de SQL"
+    ],
+    "file": "demos/26-pipeline-etl.html"
+  },
+  {
+    "id": "27",
+    "title": "Firma y verificación de tokens JWT",
+    "tagline": "SHA-256 y HMAC implementados a mano para firmar y verificar tokens HS256: edita la carga útil y observa cómo la firma deja de coincidir al instante.",
+    "area": "backend",
+    "areaLabel": "Backend y datos",
+    "stack": [
+      "JavaScript",
+      "Criptografía",
+      "JWT"
+    ],
+    "highlights": [
+      "SHA-256 y HMAC escritos desde cero, sin Web Crypto ni librerías externas",
+      "Codificación base64url correcta, con el relleno que el estándar exige quitar",
+      "Verificación completa: firma, expiración, validez desde y emisor esperado"
+    ],
+    "file": "demos/27-jwt-autenticacion.html"
+  },
+  {
+    "id": "28",
+    "title": "Generador de datos de prueba",
+    "tagline": "Registros sintéticos con sabor peruano para poblar una base de datos de desarrollo: misma semilla, mismo resultado, y salida en JSON, CSV, SQL o TypeScript.",
+    "area": "backend",
+    "areaLabel": "Backend y datos",
+    "stack": [
+      "JavaScript",
+      "PRNG con semilla",
+      "Serialización"
+    ],
+    "highlights": [
+      "Generador congruencial con semilla: el mismo número reproduce exactamente el mismo lote",
+      "Campos correlacionados — el correo se deriva del nombre y de la empresa, no se sortea aparte",
+      "Cuatro serializadores, incluido el tipo TypeScript inferido de los campos elegidos"
+    ],
+    "file": "demos/28-generador-datos.html"
+  },
+  {
+    "id": "29",
+    "title": "Monitor de logs y métricas",
+    "tagline": "Flujo de eventos en vivo con filtros por servicio y nivel, percentiles de latencia calculados sobre ventana móvil y un botón para provocar un incidente y ver cómo reacciona el panel.",
+    "area": "backend",
+    "areaLabel": "Backend y datos",
+    "stack": [
+      "JavaScript",
+      "Observabilidad",
+      "SVG"
+    ],
+    "highlights": [
+      "Percentiles p50, p95 y p99 sobre una ventana móvil de peticiones, no promedios",
+      "Tasa de error por minuto con umbral de alerta y estado de cada servicio",
+      "Simulación de incidente que degrada un servicio y se propaga a las métricas"
+    ],
+    "file": "demos/29-monitor-logs.html"
+  },
+  {
+    "id": "30",
+    "title": "Generador de sistema de color",
+    "tagline": "Escalas construidas en OKLCH para que cada paso se perciba parejo, neutros teñidos con el matiz de la marca, verificación de contraste WCAG y exportación a CSS, Tailwind o JSON.",
+    "area": "backend",
+    "areaLabel": "Backend y datos",
+    "stack": [
+      "JavaScript",
+      "OKLCH",
+      "WCAG"
+    ],
+    "highlights": [
+      "Conversión sRGB ↔ OKLab ↔ OKLCH implementada a mano, con recorte de gamut por croma",
+      "Relación de contraste calculada con la luminancia relativa de la norma WCAG 2.1",
+      "Tres formatos de exportación generados del mismo conjunto de tokens"
+    ],
+    "file": "demos/30-sistema-de-color.html"
+  }
+]

@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Diseño de mezcla de concreto ACI 211.1 · CODE</title>
+<meta name="description" content="Dosificación completa por el método del volumen absoluto: resistencia promedio requerida, relación agua/cemento, agregados y corrección por humedad de obra.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20100%20100%22%3E%3Ccircle%20cx%3D%2250%22%20cy%3D%2250%22%20r%3D%2241%22%20fill%3D%22none%22%20stroke%3D%22%2523E7B93D%22%20stroke-width%3D%228%22%2F%3E%3Cg%20fill%3D%22none%22%20stroke%3D%22%2523E7B93D%22%20stroke-width%3D%225%22%20stroke-linecap%3D%22round%22%3E%3Cpath%20d%3D%22M30%2026%20L52%2048%22%2F%3E%3Cpath%20d%3D%22M24%2034%20L40%2050%20L40%2058%22%2F%3E%3Cpath%20d%3D%22M20%2044%20L30%2054%20L30%2064%22%2F%3E%3C%2Fg%3E%3Cg%20fill%3D%22%2523E7B93D%22%3E%3Ccircle%20cx%3D%2252%22%20cy%3D%2248%22%20r%3D%225.5%22%2F%3E%3Ccircle%20cx%3D%2240%22%20cy%3D%2258%22%20r%3D%225.5%22%2F%3E%3Ccircle%20cx%3D%2230%22%20cy%3D%2264%22%20r%3D%225.5%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E">
+<script>(function(){try{var t=localStorage.getItem('code-theme');if(t!=='light'&&t!=='dark'){t=matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';}document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="../assets/demo.css">
+
+</head>
+<body>
+<div class="wrap">
+<header class="demo-head">
+  <a class="brand-bar" href="../index.html">
+    <svg viewBox="0 0 100 100" width="20" height="20" aria-hidden="true">
+      <circle cx="50" cy="50" r="41" fill="none" stroke="currentColor" stroke-width="7"/>
+      <g fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round">
+        <path d="M30 26 L52 48"/>
+        <path d="M24 34 L40 50 L40 58"/>
+        <path d="M20 44 L30 54 L30 64"/>
+      </g>
+      <g fill="currentColor">
+        <circle cx="52" cy="48" r="5"/>
+        <circle cx="40" cy="58" r="5"/>
+        <circle cx="30" cy="64" r="5"/>
+      </g>
+    </svg>
+    <span>CODE</span>
+  </a>
+  <span class="idx">04</span>
+  <h1>Diseño de mezcla de concreto ACI 211.1</h1>
+  <div class="head-actions">
+    <button type="button" class="theme-toggle" id="themeToggle" aria-pressed="false"></button>
+    <a class="back" href="../index.html">← Portafolio</a>
+  </div>
+  <p class="sub">Dosificación completa por el método del volumen absoluto: resistencia promedio requerida, relación agua/cemento, agregados y corrección por humedad de obra.</p>
+</header>
+<div class="cols-2">
+  <div class="stack">
+    <section class="panel">
+      <h2>Especificación</h2>
+      <fieldset>
+        <div class="cols" style="gap:12px">
+          <div class="field"><label for="fc">f'c (kg/cm²)</label><input type="number" id="fc" value="210" step="10" min="100"></div>
+          <div class="field"><label for="sd">Desv. estándar s</label><input type="number" id="sd" value="0" step="5" min="0"><span class="hint">0 = sin registro histórico</span></div>
+        </div>
+        <div class="field">
+          <label for="slump">Asentamiento</label>
+          <select id="slump"><option value="0">1" – 2" seco</option><option value="1" selected>3" – 4" plástico</option><option value="2">6" – 7" fluido</option></select>
+        </div>
+        <div class="field">
+          <label for="tmn">Tamaño máximo nominal del agregado</label>
+          <select id="tmn">
+            <option value="0">3/8" (9.5 mm)</option><option value="1">1/2" (12.5 mm)</option>
+            <option value="2" selected>3/4" (19 mm)</option><option value="3">1" (25 mm)</option>
+            <option value="4">1 1/2" (37.5 mm)</option><option value="5">2" (50 mm)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="aire">Aire incorporado</label>
+          <select id="aire"><option value="no" selected>Sin incorporador — aire atrapado</option><option value="si">Con incorporador — exposición severa</option></select>
+        </div>
+      </fieldset>
+    </section>
+
+    <section class="panel">
+      <h2>Caracterización de agregados</h2>
+      <fieldset>
+        <div class="cols" style="gap:12px">
+          <div class="field"><label for="mf">Módulo de fineza arena</label><input type="number" id="mf" value="2.70" step="0.05" min="2.2" max="3.2"></div>
+          <div class="field"><label for="puv">PUV varillado piedra (kg/m³)</label><input type="number" id="puv" value="1560" step="10"></div>
+          <div class="field"><label for="peg">Peso específico piedra</label><input type="number" id="peg" value="2.65" step="0.01"></div>
+          <div class="field"><label for="pea">Peso específico arena</label><input type="number" id="pea" value="2.60" step="0.01"></div>
+          <div class="field"><label for="hg">Humedad piedra (%)</label><input type="number" id="hg" value="1.0" step="0.1"></div>
+          <div class="field"><label for="ag">Absorción piedra (%)</label><input type="number" id="ag" value="0.5" step="0.1"></div>
+          <div class="field"><label for="ha">Humedad arena (%)</label><input type="number" id="ha" value="4.0" step="0.1"></div>
+          <div class="field"><label for="aa">Absorción arena (%)</label><input type="number" id="aa" value="1.0" step="0.1"></div>
+        </div>
+      </fieldset>
+    </section>
+  </div>
+
+  <div class="stack">
+    <section class="panel">
+      <h2>Dosificación por m³</h2>
+      <div class="cols" style="gap:10px">
+        <div class="readout hi"><span class="k">f'cr requerido</span><span class="v" id="fcr">—</span><span class="u">kg/cm²</span></div>
+        <div class="readout"><span class="k">Relación a/c</span><span class="v" id="ac">—</span></div>
+      </div>
+      <div class="tablewrap" style="margin-top:14px">
+        <table>
+          <thead><tr><th>Material</th><th class="num">Diseño (kg)</th><th class="num">Obra (kg)</th><th class="num">Proporción</th></tr></thead>
+          <tbody id="dosif"></tbody>
+        </table>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <span class="chip acc" id="bolsas">—</span>
+        <span class="chip" id="rend">—</span>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Composición volumétrica del m³</h2>
+      <div id="barra"></div>
+      <p class="note" style="margin-top:12px">Los volúmenes absolutos suman 1.000 m³. La arena es lo que queda tras descontar cemento, agua, aire y piedra — de ahí que su peso dependa de todo lo anterior.</p>
+    </section>
+  </div>
+</div>
+<footer class="demo-foot">
+  <span>CODE · Ingeniería · demo 04 de 30</span>
+  <span>JavaScript · SVG · ACI 211.1</span>
+</footer>
+</div>
+<script src="../assets/demo.js"></script>
+<script src="../assets/exportar.js"></script>
+
+<script>
+const { $, el, num, fmt, token, draw, svgEl, onThemeChange } = CODE;
+
+const AGUA_SIN = [[207,199,190,179,166,154],[228,216,205,193,181,169],[243,228,216,202,190,178]];
+const AGUA_CON = [[181,175,168,160,150,142],[202,193,184,175,165,157],[216,205,197,184,174,166]];
+const AIRE_ATRAPADO = [3.0,2.5,2.0,1.5,1.0,0.5];
+const AIRE_TOTAL = [7.5,7.0,6.0,6.0,5.5,5.0];
+const AC_SIN = [[150,0.80],[200,0.70],[250,0.62],[300,0.55],[350,0.48],[400,0.43],[450,0.38]];
+const AC_CON = [[150,0.71],[200,0.61],[250,0.53],[300,0.46],[350,0.40],[400,0.35]];
+const BB0 = [[0.50,0.48,0.46,0.44],[0.59,0.57,0.55,0.53],[0.66,0.64,0.62,0.60],[0.71,0.69,0.67,0.65],[0.75,0.73,0.71,0.69],[0.78,0.76,0.74,0.72]];
+const MF_COL = [2.40,2.60,2.80,3.00];
+
+function interpTabla(tabla, x) {
+  if (x <= tabla[0][0]) return tabla[0][1];
+  const ult = tabla[tabla.length - 1];
+  if (x >= ult[0]) return ult[1];
+  for (let i = 0; i < tabla.length - 1; i++) {
+    const [x1, y1] = tabla[i], [x2, y2] = tabla[i + 1];
+    if (x >= x1 && x <= x2) return y1 + (y2 - y1) * (x - x1) / (x2 - x1);
+  }
+  return ult[1];
+}
+
+function bSobreB0(tmn, mf) {
+  const fila = BB0[tmn];
+  const m = Math.min(3.0, Math.max(2.4, mf));
+  for (let i = 0; i < MF_COL.length - 1; i++) {
+    if (m >= MF_COL[i] && m <= MF_COL[i + 1]) {
+      const f = (m - MF_COL[i]) / (MF_COL[i + 1] - MF_COL[i]);
+      return fila[i] + (fila[i + 1] - fila[i]) * f;
+    }
+  }
+  return fila[fila.length - 1];
+}
+
+function calcular() {
+  const fc = num($('#fc').value, 210), s = num($('#sd').value, 0);
+  const slump = +$('#slump').value, tmn = +$('#tmn').value;
+  const conAire = $('#aire').value === 'si';
+
+  const fcr = s > 0
+    ? Math.max(fc + 1.34 * s, fc + 2.33 * s - 35)
+    : (fc < 210 ? fc + 70 : fc <= 350 ? fc + 84 : 1.10 * fc + 50);
+
+  const agua = (conAire ? AGUA_CON : AGUA_SIN)[slump][tmn];
+  const aire = (conAire ? AIRE_TOTAL : AIRE_ATRAPADO)[tmn];
+  const ac = interpTabla(conAire ? AC_CON : AC_SIN, fcr);
+  const cemento = agua / ac;
+
+  const mf = num($('#mf').value, 2.7), puv = num($('#puv').value, 1560);
+  const peg = num($('#peg').value, 2.65), pea = num($('#pea').value, 2.60);
+  const piedra = bSobreB0(tmn, mf) * puv;
+
+  const vCem = cemento / (3.15 * 1000), vAgua = agua / 1000;
+  const vAire = aire / 100, vPiedra = piedra / (peg * 1000);
+  const vArena = Math.max(0, 1 - vCem - vAgua - vAire - vPiedra);
+  const arena = vArena * pea * 1000;
+
+  const hg = num($('#hg').value, 0) / 100, ag = num($('#ag').value, 0) / 100;
+  const ha = num($('#ha').value, 0) / 100, aa = num($('#aa').value, 0) / 100;
+  const piedraObra = piedra * (1 + hg), arenaObra = arena * (1 + ha);
+  const aporte = piedra * (hg - ag) + arena * (ha - aa);
+  const aguaObra = agua - aporte;
+
+  $('#fcr').textContent = fmt(fcr, 0);
+  $('#ac').textContent = fmt(ac, 3);
+
+  const filas = [
+    ['Cemento', cemento, cemento],
+    ['Agua', agua, aguaObra],
+    ['Piedra chancada', piedra, piedraObra],
+    ['Arena gruesa', arena, arenaObra]
+  ];
+  const tb = $('#dosif'); tb.textContent = '';
+  filas.forEach(([n, d, o]) => tb.appendChild(el('tr', null, [
+    el('td', { text: n }),
+    el('td.num', { text: fmt(d, 1) }),
+    el('td.num', { text: fmt(o, 1) }),
+    el('td.num', { text: fmt(d / cemento, 2) })
+  ])));
+
+  $('#bolsas').textContent = fmt(cemento / 42.5, 2) + ' bolsas de 42.5 kg por m³';
+  $('#rend').textContent = 'Aire ' + fmt(aire, 1) + ' % · agua de obra ' + fmt(aguaObra, 1) + ' L';
+
+  barra([
+    ['Cemento', vCem, token('ink')],
+    ['Agua', vAgua, token('blue')],
+    ['Aire', vAire, token('muted')],
+    ['Piedra', vPiedra, token('accent')],
+    ['Arena', vArena, 'color-mix(in srgb, ' + token('accent') + ' 42%, transparent)']
+  ]);
+}
+
+function barra(items) {
+  const w = 620, h = 130, pad = 12, bh = 46, y = 30;
+  const svg = svgEl('svg', { class: 'chart', viewBox: `0 0 ${w} ${h}`, role: 'img' });
+  let x = pad;
+  items.forEach(([nombre, v, color]) => {
+    const bw = v * (w - 2 * pad);
+    svg.appendChild(svgEl('rect', { x, y, width: Math.max(0, bw), height: bh, fill: color }));
+    if (bw > 46) {
+      const t = svgEl('text', { x: x + bw / 2, y: y + bh + 16, 'text-anchor': 'middle' });
+      t.textContent = nombre;
+      svg.appendChild(t);
+      const p = svgEl('text', { x: x + bw / 2, y: y + bh + 30, 'text-anchor': 'middle' });
+      p.textContent = fmt(v * 1000, 0) + ' L';
+      svg.appendChild(p);
+    }
+    x += bw;
+  });
+  const tot = svgEl('text', { x: pad, y: 18 });
+  tot.textContent = 'Volumen absoluto total 1.000 m³';
+  svg.appendChild(tot);
+  draw($('#barra'), svg);
+}
+
+['#fc','#sd','#slump','#tmn','#aire','#mf','#puv','#peg','#pea','#hg','#ag','#ha','#aa']
+  .forEach(s => $(s).addEventListener('input', calcular));
+onThemeChange(calcular);
+calcular();
+
+/* ---- exportación de resultados ---- */
+const X = CODE.exportar;
+X.registrar(() => ({
+  titulo: "Diseño de mezcla de concreto f'c = " + $('#fc').value + ' kg/cm²',
+  subtitulo: 'Método del volumen absoluto, ACI 211.1',
+  resumen: X.desdeReadouts().concat([
+    { k: 'Bolsas por m³', v: $('#bolsas').textContent },
+    { k: 'Aire y agua de obra', v: $('#rend').textContent }
+  ]),
+  tablas: [X.desdeTbody('#dosif', ['Material', 'Diseño (kg)', 'Obra (kg)', 'Proporción'], 'Dosificación por metro cúbico')],
+  nota: 'La columna «obra» ya incorpora la corrección por humedad y absorción de los agregados.'
+}));
+</script>
+</body>
+</html>

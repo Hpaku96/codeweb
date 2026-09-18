@@ -1,0 +1,275 @@
+<!--meta
+{
+  "id": "29",
+  "title": "Monitor de logs y métricas",
+  "tagline": "Flujo de eventos en vivo con filtros por servicio y nivel, percentiles de latencia calculados sobre ventana móvil y un botón para provocar un incidente y ver cómo reacciona el panel.",
+  "area": "backend",
+  "stack": ["JavaScript", "Observabilidad", "SVG"],
+  "highlights": [
+    "Percentiles p50, p95 y p99 sobre una ventana móvil de peticiones, no promedios",
+    "Tasa de error por minuto con umbral de alerta y estado de cada servicio",
+    "Simulación de incidente que degrada un servicio y se propaga a las métricas"
+  ]
+}
+-->
+
+<section class="panel" style="margin-bottom:16px">
+  <div class="row" style="justify-content:space-between">
+    <div class="row">
+      <button class="primary" id="pausa">⏸ Pausar</button>
+      <button class="sm" id="incidente">Provocar incidente</button>
+      <button class="sm" id="limpiar">Limpiar</button>
+    </div>
+    <div class="row">
+      <span class="chip" id="estadoGlobal">—</span>
+      <span class="chip" id="uptime">—</span>
+    </div>
+  </div>
+</section>
+
+<div class="cols" style="margin-bottom:16px">
+  <div class="readout"><span class="k">Peticiones por segundo</span><span class="v" id="rps">—</span></div>
+  <div class="readout hi"><span class="k">Tasa de error</span><span class="v" id="errRate">—</span><span class="u">último minuto</span></div>
+  <div class="readout"><span class="k">Latencia p95</span><span class="v" id="p95">—</span><span class="u">ms</span></div>
+  <div class="readout"><span class="k">Eventos en memoria</span><span class="v" id="total">—</span></div>
+</div>
+
+<div class="cols-2" style="grid-template-columns:minmax(0,1.25fr) minmax(0,1fr)">
+  <div class="stack">
+    <section class="panel">
+      <h2>Flujo de eventos</h2>
+      <div class="row" style="gap:10px;margin-bottom:12px">
+        <div class="seg" id="nivel">
+          <button aria-pressed="true" data-n="">Todos</button>
+          <button aria-pressed="false" data-n="info">Info</button>
+          <button aria-pressed="false" data-n="warn">Warn</button>
+          <button aria-pressed="false" data-n="error">Error</button>
+        </div>
+        <div class="field" style="min-width:160px"><label for="servicio">Servicio</label><select id="servicio"></select></div>
+        <div class="field" style="flex:1 1 160px"><label for="q">Buscar en el mensaje</label><input type="search" id="q" placeholder="timeout, 500, sku…"></div>
+      </div>
+      <div class="console" id="tail" style="max-height:420px;font-size:11.5px"></div>
+    </section>
+  </div>
+
+  <div class="stack">
+    <section class="panel"><h2>Peticiones por segundo</h2><div id="gRps"></div></section>
+    <section class="panel"><h2>Latencia (ms)</h2><div id="gLat"></div></section>
+    <section class="panel">
+      <h2>Estado por servicio</h2>
+      <div class="tablewrap"><table><thead><tr><th>Servicio</th><th class="num">Peticiones</th><th class="num">Errores</th><th class="num">p99</th><th>Estado</th></tr></thead><tbody id="servicios"></tbody></table></div>
+    </section>
+  </div>
+</div>
+
+<script>
+const { $, $$, el, fmt, token, lineChart, draw, onThemeChange } = CODE;
+
+const SERVICIOS = [
+  { nombre: 'api-pedidos', base: 48, peso: 0.38 },
+  { nombre: 'web-catalogo', base: 28, peso: 0.3 },
+  { nombre: 'worker-facturacion', base: 180, peso: 0.12 },
+  { nombre: 'postgres', base: 9, peso: 0.14 },
+  { nombre: 'redis', base: 2, peso: 0.06 }
+];
+
+const RUTAS = ['GET /v1/productos', 'GET /v1/clientes', 'POST /v1/pedidos', 'PATCH /v1/pedidos/:id', 'GET /v1/reportes/resumen', 'GET /health'];
+const MENSAJES_OK = [
+  'petición atendida', 'cache hit', 'consulta resuelta', 'pedido registrado',
+  'token verificado', 'lote de facturación procesado', 'conexión reutilizada del pool'
+];
+const MENSAJES_WARN = [
+  'consulta lenta sobre pedido_items', 'pool de conexiones al 85 %', 'reintento 1 de 3',
+  'cache miss en catálogo', 'respuesta mayor a 1 s'
+];
+const MENSAJES_ERROR = [
+  'timeout al conectar con la base de datos', 'HTTP 500 al crear el pedido',
+  'clave foránea violada en pedido_items', 'token expirado', 'no se pudo escribir en el bus de eventos'
+];
+
+let eventos = [], segundos = [], corriendo = true, inicio = Date.now(), incidenteHasta = 0;
+let filtroNivel = '', filtroServicio = '', busqueda = '';
+let acumuladoSegundo = { n: 0, err: 0 };
+
+function generarEvento() {
+  const s = SERVICIOS.find(x => Math.random() < x.peso) || SERVICIOS[0];
+  const enIncidente = Date.now() < incidenteHasta && s.nombre === 'postgres';
+  const factor = enIncidente ? 9 : 1;
+  const latencia = Math.max(1, s.base * factor * (0.4 + Math.random() * Math.random() * 4.5));
+  const azar = Math.random();
+  const probError = enIncidente ? 0.42 : 0.018;
+  const nivel = azar < probError ? 'error' : azar < probError + 0.07 ? 'warn' : 'info';
+  const mensaje = nivel === 'error' ? MENSAJES_ERROR[Math.floor(Math.random() * MENSAJES_ERROR.length)]
+    : nivel === 'warn' ? MENSAJES_WARN[Math.floor(Math.random() * MENSAJES_WARN.length)]
+    : MENSAJES_OK[Math.floor(Math.random() * MENSAJES_OK.length)];
+  return {
+    t: Date.now(), servicio: s.nombre, nivel,
+    ruta: RUTAS[Math.floor(Math.random() * RUTAS.length)],
+    ms: Math.round(latencia),
+    estado: nivel === 'error' ? (Math.random() < 0.5 ? 500 : 503) : nivel === 'warn' ? 200 : 200,
+    traza: Math.random().toString(16).slice(2, 10),
+    mensaje
+  };
+}
+
+function percentil(valores, p) {
+  if (!valores.length) return 0;
+  const orden = valores.slice().sort((a, b) => a - b);
+  return orden[Math.min(orden.length - 1, Math.floor(orden.length * p))];
+}
+
+function tic() {
+  if (!corriendo) return;
+  const n = 2 + Math.floor(Math.random() * 6) + (Date.now() < incidenteHasta ? 4 : 0);
+  for (let i = 0; i < n; i++) {
+    const e = generarEvento();
+    eventos.push(e);
+    acumuladoSegundo.n++;
+    if (e.nivel === 'error') acumuladoSegundo.err++;
+  }
+  if (eventos.length > 1200) eventos = eventos.slice(-1200);
+  pintarTail();
+}
+
+function cadaSegundo() {
+  if (!corriendo) return;
+  const ventana = eventos.filter(e => e.t > Date.now() - 1000);
+  segundos.push({
+    t: Date.now(),
+    rps: acumuladoSegundo.n,
+    err: acumuladoSegundo.err,
+    p50: percentil(ventana.map(e => e.ms), 0.5),
+    p95: percentil(ventana.map(e => e.ms), 0.95),
+    p99: percentil(ventana.map(e => e.ms), 0.99)
+  });
+  if (segundos.length > 60) segundos.shift();
+  acumuladoSegundo = { n: 0, err: 0 };
+  pintarMetricas();
+}
+
+function pintarMetricas() {
+  const minuto = eventos.filter(e => e.t > Date.now() - 60000);
+  const errores = minuto.filter(e => e.nivel === 'error').length;
+  const tasa = minuto.length ? errores / minuto.length * 100 : 0;
+  const lat = minuto.map(e => e.ms);
+
+  $('#rps').textContent = fmt(segundos.length ? segundos[segundos.length - 1].rps : 0, 0);
+  $('#errRate').textContent = fmt(tasa, 2) + ' %';
+  $('#errRate').style.color = tasa > 5 ? 'var(--bad)' : tasa > 1 ? 'var(--warn)' : '';
+  $('#p95').textContent = fmt(percentil(lat, 0.95), 0);
+  $('#total').textContent = eventos.length;
+  const seg = Math.floor((Date.now() - inicio) / 1000);
+  $('#uptime').textContent = 'Monitorizando ' + Math.floor(seg / 60) + ' min ' + String(seg % 60).padStart(2, '0') + ' s';
+  const ge = $('#estadoGlobal');
+  ge.className = 'chip ' + (tasa > 5 ? 'bad' : tasa > 1 ? 'warn' : 'good');
+  ge.textContent = tasa > 5 ? 'Incidente en curso' : tasa > 1 ? 'Degradado' : 'Operación normal';
+
+  draw($('#gRps'), lineChart({
+    series: [
+      { points: segundos.map((s, i) => [i, s.rps]), color: token('blue'), width: 2, fill: 'color-mix(in srgb, ' + token('blue') + ' 16%, transparent)' },
+      { points: segundos.map((s, i) => [i, s.err]), color: token('bad'), width: 2 }
+    ],
+    w: 520, h: 190, yMin: 0, xMin: 0, xMax: Math.max(59, segundos.length - 1),
+    xTickVals: [0, 15, 30, 45, 59], xFmt: v => '-' + (59 - Math.round(v)) + 's', yFmt: v => fmt(v, 0)
+  }));
+
+  draw($('#gLat'), lineChart({
+    series: [
+      { points: segundos.map((s, i) => [i, s.p99]), color: token('bad'), width: 1.6 },
+      { points: segundos.map((s, i) => [i, s.p95]), color: token('accent'), width: 2 },
+      { points: segundos.map((s, i) => [i, s.p50]), color: token('muted'), width: 1.6, dash: '4 3' }
+    ],
+    w: 520, h: 190, yMin: 0, xMin: 0, xMax: Math.max(59, segundos.length - 1),
+    xTickVals: [0, 15, 30, 45, 59], xFmt: v => '-' + (59 - Math.round(v)) + 's', yFmt: v => fmt(v, 0)
+  }));
+
+  const tb = $('#servicios'); tb.textContent = '';
+  SERVICIOS.forEach(s => {
+    const suyos = minuto.filter(e => e.servicio === s.nombre);
+    const err = suyos.filter(e => e.nivel === 'error').length;
+    const t = suyos.length ? err / suyos.length : 0;
+    const clase = t > 0.1 ? 'bad' : t > 0.02 ? 'warn' : 'good';
+    tb.appendChild(el('tr', null, [
+      el('td', { text: s.nombre }),
+      el('td.num', { text: suyos.length }),
+      el('td.num', { text: err }),
+      el('td.num', { text: fmt(percentil(suyos.map(e => e.ms), 0.99), 0) }),
+      el('td', null, el('span', { class: 'chip ' + clase, text: clase === 'bad' ? 'Caído' : clase === 'warn' ? 'Degradado' : 'Sano' }))
+    ]));
+  });
+}
+
+function pintarTail() {
+  const filtrados = eventos.filter(e =>
+    (!filtroNivel || e.nivel === filtroNivel) &&
+    (!filtroServicio || e.servicio === filtroServicio) &&
+    (!busqueda || (e.mensaje + ' ' + e.ruta + ' ' + e.estado).toLowerCase().includes(busqueda)))
+    .slice(-120).reverse();
+
+  const clase = { info: 'c-mut', warn: 'c-acc', error: 'c-bad' };
+  $('#tail').innerHTML = filtrados.map(e => {
+    const hora = new Date(e.t).toLocaleTimeString('es-PE', { hour12: false });
+    return '<span class="c-mut">' + hora + '</span> ' +
+      '<span class="' + clase[e.nivel] + '">' + e.nivel.toUpperCase().padEnd(5) + '</span> ' +
+      '<span class="c-key">' + e.servicio.padEnd(19) + '</span> ' +
+      e.ruta.padEnd(26) + ' ' +
+      '<span class="' + (e.estado >= 500 ? 'c-bad' : 'c-ok') + '">' + e.estado + '</span> ' +
+      String(e.ms).padStart(5) + 'ms  ' + e.mensaje +
+      ' <span class="c-mut">trace=' + e.traza + '</span>';
+  }).join('\n');
+}
+
+$('#servicio').appendChild(el('option', { value: '', text: 'Todos' }));
+SERVICIOS.forEach(s => $('#servicio').appendChild(el('option', { value: s.nombre, text: s.nombre })));
+
+$$('#nivel button').forEach(b => b.addEventListener('click', () => {
+  $$('#nivel button').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+  filtroNivel = b.dataset.n;
+  pintarTail();
+}));
+$('#servicio').addEventListener('input', e => { filtroServicio = e.target.value; pintarTail(); });
+$('#q').addEventListener('input', e => { busqueda = e.target.value.trim().toLowerCase(); pintarTail(); });
+$('#pausa').addEventListener('click', e => {
+  corriendo = !corriendo;
+  e.target.textContent = corriendo ? '⏸ Pausar' : '▶ Reanudar';
+  e.target.classList.toggle('primary', corriendo);
+});
+$('#incidente').addEventListener('click', () => { incidenteHasta = Date.now() + 20000; });
+$('#limpiar').addEventListener('click', () => { eventos = []; segundos = []; pintarTail(); pintarMetricas(); });
+onThemeChange(pintarMetricas);
+
+for (let i = 0; i < 40; i++) {
+  const e = generarEvento();
+  e.t = Date.now() - (40 - i) * 250;
+  eventos.push(e);
+}
+for (let i = 0; i < 30; i++) {
+  segundos.push({ t: Date.now() - (30 - i) * 1000, rps: 3 + Math.floor(Math.random() * 6), err: Math.random() < 0.2 ? 1 : 0, p50: 30 + Math.random() * 20, p95: 90 + Math.random() * 60, p99: 160 + Math.random() * 120 });
+}
+pintarTail(); pintarMetricas();
+setInterval(tic, 320);
+setInterval(cadaSegundo, 1000);
+
+/* ---- exportación de resultados ---- */
+const X = CODE.exportar;
+X.registrar(() => {
+  const minuto = eventos.filter(e => e.t > Date.now() - 60000);
+  return {
+    titulo: 'Reporte de observabilidad',
+    subtitulo: minuto.length + ' eventos en el último minuto · ' + $('#estadoGlobal').textContent,
+    resumen: X.desdeReadouts(),
+    tablas: [
+      { titulo: 'Estado por servicio', columnas: ['Servicio', 'Peticiones', 'Errores', 'p99 (ms)'],
+        filas: SERVICIOS.map(s => {
+          const suyos = minuto.filter(e => e.servicio === s.nombre);
+          return [s.nombre, suyos.length, suyos.filter(e => e.nivel === 'error').length, fmt(percentil(suyos.map(e => e.ms), 0.99), 0)];
+        }) },
+      { titulo: 'Eventos recientes', columnas: ['Hora', 'Nivel', 'Servicio', 'Ruta', 'Estado', 'ms', 'Mensaje', 'Traza'],
+        filas: eventos.slice(-200).reverse().map(e => [
+          new Date(e.t).toLocaleTimeString('es-PE', { hour12: false }), e.nivel, e.servicio, e.ruta, e.estado, e.ms, e.mensaje, e.traza]) }
+    ],
+    nota: 'Flujo de eventos simulado para demostrar el panel.'
+  };
+});
+
+</script>

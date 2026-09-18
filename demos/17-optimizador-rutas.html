@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Optimizador de rutas de reparto · CODE</title>
+<meta name="description" content="Vecino más cercano seguido de mejora 2-opt sobre las coordenadas reales de cada cliente, con comparación contra el orden original y estimación de tiempo de jornada.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20100%20100%22%3E%3Ccircle%20cx%3D%2250%22%20cy%3D%2250%22%20r%3D%2241%22%20fill%3D%22none%22%20stroke%3D%22%2523E7B93D%22%20stroke-width%3D%228%22%2F%3E%3Cg%20fill%3D%22none%22%20stroke%3D%22%2523E7B93D%22%20stroke-width%3D%225%22%20stroke-linecap%3D%22round%22%3E%3Cpath%20d%3D%22M30%2026%20L52%2048%22%2F%3E%3Cpath%20d%3D%22M24%2034%20L40%2050%20L40%2058%22%2F%3E%3Cpath%20d%3D%22M20%2044%20L30%2054%20L30%2064%22%2F%3E%3C%2Fg%3E%3Cg%20fill%3D%22%2523E7B93D%22%3E%3Ccircle%20cx%3D%2252%22%20cy%3D%2248%22%20r%3D%225.5%22%2F%3E%3Ccircle%20cx%3D%2240%22%20cy%3D%2258%22%20r%3D%225.5%22%2F%3E%3Ccircle%20cx%3D%2230%22%20cy%3D%2264%22%20r%3D%225.5%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E">
+<script>(function(){try{var t=localStorage.getItem('code-theme');if(t!=='light'&&t!=='dark'){t=matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';}document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="../assets/demo.css">
+
+</head>
+<body>
+<div class="wrap">
+<header class="demo-head">
+  <a class="brand-bar" href="../index.html">
+    <svg viewBox="0 0 100 100" width="20" height="20" aria-hidden="true">
+      <circle cx="50" cy="50" r="41" fill="none" stroke="currentColor" stroke-width="7"/>
+      <g fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round">
+        <path d="M30 26 L52 48"/>
+        <path d="M24 34 L40 50 L40 58"/>
+        <path d="M20 44 L30 54 L30 64"/>
+      </g>
+      <g fill="currentColor">
+        <circle cx="52" cy="48" r="5"/>
+        <circle cx="40" cy="58" r="5"/>
+        <circle cx="30" cy="64" r="5"/>
+      </g>
+    </svg>
+    <span>CODE</span>
+  </a>
+  <span class="idx">17</span>
+  <h1>Optimizador de rutas de reparto</h1>
+  <div class="head-actions">
+    <button type="button" class="theme-toggle" id="themeToggle" aria-pressed="false"></button>
+    <a class="back" href="../index.html">← Portafolio</a>
+  </div>
+  <p class="sub">Vecino más cercano seguido de mejora 2-opt sobre las coordenadas reales de cada cliente, con comparación contra el orden original y estimación de tiempo de jornada.</p>
+</header>
+<section class="panel" style="margin-bottom:16px">
+  <div class="row" style="gap:14px">
+    <button class="primary" id="optimizar">Optimizar recorrido</button>
+    <button class="sm" id="reset">Orden original</button>
+    <div class="field" style="min-width:150px"><label for="vel">Velocidad promedio (km/h)</label><input type="number" id="vel" value="18" min="5" step="1"></div>
+    <div class="field" style="min-width:160px"><label for="atencion">Atención por cliente (min)</label><input type="number" id="atencion" value="12" min="1" step="1"></div>
+    <div class="field" style="min-width:150px"><label for="trama">Factor de trama urbana</label><input type="number" id="trama" value="1.32" min="1" max="2" step="0.01"></div>
+  </div>
+</section>
+
+<div class="cols-2" style="grid-template-columns:minmax(0,1fr) minmax(0,1.25fr)">
+  <div class="stack">
+    <section class="panel">
+      <h2>Paradas de la jornada</h2>
+      <div class="tablewrap" style="max-height:330px;overflow-y:auto">
+        <table><thead><tr><th></th><th>Cliente</th><th>Distrito</th></tr></thead><tbody id="paradas"></tbody></table>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <button class="sm" id="todos">Seleccionar todo</button>
+        <button class="sm" id="ninguno">Ninguno</button>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Resultado</h2>
+      <div class="cols" style="gap:10px">
+        <div class="readout hi"><span class="k">Recorrido</span><span class="v" id="km">—</span><span class="u">km</span></div>
+        <div class="readout"><span class="k">Jornada estimada</span><span class="v" id="hrs">—</span></div>
+      </div>
+      <dl class="kv" style="margin-top:14px">
+        <dt>Orden original</dt><dd id="kmBase">—</dd>
+        <dt>Ahorro con la optimización</dt><dd id="ahorro">—</dd>
+        <dt>Intercambios 2-opt aplicados</dt><dd id="swaps">—</dd>
+        <dt>Distancia media entre paradas</dt><dd id="media">—</dd>
+      </dl>
+    </section>
+  </div>
+
+  <div class="stack">
+    <section class="panel"><h2>Mapa del recorrido</h2><div id="mapa"></div></section>
+    <section class="panel">
+      <h2>Hoja de ruta</h2>
+      <div class="tablewrap"><table><thead><tr><th class="num">#</th><th>Parada</th><th class="num">Tramo (km)</th><th class="num">Acumulado</th><th>Llegada</th></tr></thead><tbody id="hoja"></tbody></table></div>
+    </section>
+  </div>
+</div>
+<footer class="demo-foot">
+  <span>CODE · Negocio y comercio · demo 17 de 30</span>
+  <span>JavaScript · Heurísticas TSP · SVG</span>
+</footer>
+</div>
+<script src="../assets/demo.js"></script>
+<script src="../assets/exportar.js"></script>
+<script src="../assets/datos-comercial.js"></script>
+<script>
+const { $, el, num, fmt, token, draw, svgEl, onThemeChange } = CODE;
+const { CLIENTES } = DATOS;
+
+const ALMACEN = { nombre: 'Almacén ARCA', distrito: 'Cercado de Lima', lat: -12.0450, lon: -77.0300 };
+const seleccion = new Set(CLIENTES.map((c, i) => i));
+let ruta = null, swaps = 0;
+
+/* Haversine + factor de trama: la calle nunca es la línea recta. */
+function distancia(a, b) {
+  const R = 6371, rad = g => g * Math.PI / 180;
+  const dLat = rad(b.lat - a.lat), dLon = rad(b.lon - a.lon);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h)) * num($('#trama').value, 1.32);
+}
+
+function largo(orden, puntos) {
+  let d = 0;
+  for (let i = 0; i < orden.length - 1; i++) d += distancia(puntos[orden[i]], puntos[orden[i + 1]]);
+  return d;
+}
+
+function vecinoMasCercano(puntos) {
+  const n = puntos.length, visto = new Array(n).fill(false);
+  const orden = [0]; visto[0] = true;
+  for (let k = 1; k < n; k++) {
+    let mejor = -1, mejorD = Infinity;
+    for (let j = 1; j < n; j++) {
+      if (visto[j]) continue;
+      const d = distancia(puntos[orden[orden.length - 1]], puntos[j]);
+      if (d < mejorD) { mejorD = d; mejor = j; }
+    }
+    orden.push(mejor); visto[mejor] = true;
+  }
+  orden.push(0);
+  return orden;
+}
+
+/* 2-opt: invierte segmentos mientras el recorrido siga acortándose. */
+function dosOpt(orden, puntos) {
+  let mejora = true; swaps = 0;
+  while (mejora) {
+    mejora = false;
+    for (let i = 1; i < orden.length - 2; i++) {
+      for (let j = i + 1; j < orden.length - 1; j++) {
+        const a = puntos[orden[i - 1]], b = puntos[orden[i]];
+        const c = puntos[orden[j]], d = puntos[orden[j + 1]];
+        const antes = distancia(a, b) + distancia(c, d);
+        const despues = distancia(a, c) + distancia(b, d);
+        if (despues < antes - 1e-9) {
+          const seg = orden.slice(i, j + 1).reverse();
+          orden.splice(i, seg.length, ...seg);
+          mejora = true; swaps++;
+        }
+      }
+    }
+  }
+  return orden;
+}
+
+function puntos() {
+  return [ALMACEN].concat(Array.from(seleccion).sort((a, b) => a - b).map(i => CLIENTES[i]));
+}
+
+function ordenBase(p) { return p.map((_, i) => i).concat([0]); }
+
+function calcular(optimizar) {
+  const p = puntos();
+  if (p.length < 2) { ruta = null; pintarHoja([], p); dibujar([], p); return; }
+  const base = ordenBase(p);
+  const kmBase = largo(base, p);
+  let orden = base;
+  if (optimizar) orden = dosOpt(vecinoMasCercano(p), p);
+  else swaps = 0;
+  ruta = orden;
+  const km = largo(orden, p);
+  const vel = num($('#vel').value, 18), at = num($('#atencion').value, 12);
+  const minutos = km / vel * 60 + (p.length - 1) * at;
+
+  $('#km').textContent = fmt(km, 2);
+  $('#hrs').textContent = Math.floor(minutos / 60) + ' h ' + String(Math.round(minutos % 60)).padStart(2, '0') + ' min';
+  $('#kmBase').textContent = fmt(kmBase, 2) + ' km';
+  const dif = kmBase - km;
+  $('#ahorro').textContent = dif > 0.001
+    ? '− ' + fmt(dif, 2) + ' km (' + fmt(dif / kmBase * 100, 1) + ' %) · ' + fmt(dif / vel * 60, 0) + ' min'
+    : 'Sin optimizar';
+  $('#swaps').textContent = swaps;
+  $('#media').textContent = fmt(km / (orden.length - 1), 2) + ' km';
+
+  pintarHoja(orden, p);
+  dibujar(orden, p);
+}
+
+function pintarHoja(orden, p) {
+  const tb = $('#hoja'); tb.textContent = '';
+  let acum = 0, minutos = 0;
+  const vel = num($('#vel').value, 18), at = num($('#atencion').value, 12);
+  orden.forEach((idx, k) => {
+    if (k > 0) {
+      const d = distancia(p[orden[k - 1]], p[idx]);
+      acum += d; minutos += d / vel * 60 + (k < orden.length - 1 ? at : 0);
+    }
+    const hora = new Date(2026, 0, 1, 8, 0);
+    hora.setMinutes(hora.getMinutes() + minutos);
+    tb.appendChild(el('tr', null, [
+      el('td.num', { text: k === 0 ? '—' : (k === orden.length - 1 ? '⤺' : k) }),
+      el('td', { text: p[idx].nombre, style: 'white-space:normal;min-width:150px' }),
+      el('td.num', { text: k === 0 ? '—' : fmt(distancia(p[orden[k - 1]], p[idx]), 2) }),
+      el('td.num', { text: fmt(acum, 2) }),
+      el('td', { text: hora.toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' }) })
+    ]));
+  });
+}
+
+function dibujar(orden, p) {
+  const w = 560, h = 440, pad = 34;
+  const lats = p.map(x => x.lat), lons = p.map(x => x.lon);
+  const latMin = Math.min(...lats), latMax = Math.max(...lats);
+  const lonMin = Math.min(...lons), lonMax = Math.max(...lons);
+  const X = lon => pad + (lon - lonMin) / ((lonMax - lonMin) || 1) * (w - 2 * pad);
+  const Y = lat => h - pad - (lat - latMin) / ((latMax - latMin) || 1) * (h - 2 * pad);
+
+  const svg = svgEl('svg', { class: 'chart', viewBox: `0 0 ${w} ${h}`, role: 'img' });
+  const acc = token('accent'), blue = token('blue'), mut = token('muted'), ink = token('ink');
+
+  for (let i = 0; i <= 6; i++) {
+    svg.appendChild(svgEl('line', { class: 'gridline', x1: pad, x2: w - pad, y1: pad + i * (h - 2 * pad) / 6, y2: pad + i * (h - 2 * pad) / 6 }));
+    svg.appendChild(svgEl('line', { class: 'gridline', y1: pad, y2: h - pad, x1: pad + i * (w - 2 * pad) / 6, x2: pad + i * (w - 2 * pad) / 6 }));
+  }
+
+  if (orden.length > 1) {
+    const d = orden.map((idx, k) => (k ? 'L' : 'M') + X(p[idx].lon).toFixed(1) + ' ' + Y(p[idx].lat).toFixed(1)).join(' ');
+    svg.appendChild(svgEl('path', { d, fill: 'none', stroke: blue, 'stroke-width': 2, 'stroke-linejoin': 'round' }));
+  }
+
+  orden.slice(0, -1).forEach((idx, k) => {
+    const x = X(p[idx].lon), y = Y(p[idx].lat);
+    const esAlmacen = idx === 0;
+    svg.appendChild(svgEl(esAlmacen ? 'rect' : 'circle', esAlmacen
+      ? { x: x - 7, y: y - 7, width: 14, height: 14, fill: ink }
+      : { cx: x, cy: y, r: 7, fill: acc }));
+    const t = svgEl('text', { x, y: y + 3.5, 'text-anchor': 'middle', fill: esAlmacen ? 'white' : 'white', style: 'font:600 9px var(--mono)' });
+    t.textContent = esAlmacen ? 'A' : String(k);
+    svg.appendChild(t);
+    const n = svgEl('text', { x: x + 11, y: y - 9, fill: mut });
+    n.textContent = p[idx].distrito;
+    svg.appendChild(n);
+  });
+  draw($('#mapa'), svg);
+}
+
+function pintarParadas() {
+  const tb = $('#paradas'); tb.textContent = '';
+  CLIENTES.forEach((c, i) => {
+    const chk = el('input', { type: 'checkbox', 'aria-label': c.nombre });
+    chk.checked = seleccion.has(i);
+    chk.addEventListener('change', () => { chk.checked ? seleccion.add(i) : seleccion.delete(i); calcular(false); });
+    tb.appendChild(el('tr', null, [el('td', null, chk), el('td', { text: c.nombre, style: 'white-space:normal' }), el('td', { text: c.distrito })]));
+  });
+}
+
+$('#optimizar').addEventListener('click', () => calcular(true));
+$('#reset').addEventListener('click', () => calcular(false));
+$('#todos').addEventListener('click', () => { CLIENTES.forEach((_, i) => seleccion.add(i)); pintarParadas(); calcular(false); });
+$('#ninguno').addEventListener('click', () => { seleccion.clear(); pintarParadas(); calcular(false); });
+['#vel', '#atencion', '#trama'].forEach(s => $(s).addEventListener('input', () => calcular(false)));
+onThemeChange(() => calcular(false));
+
+pintarParadas();
+calcular(true);
+
+/* ---- exportación de resultados ---- */
+const X = CODE.exportar;
+X.registrar(() => ({
+  titulo: 'Hoja de ruta de reparto',
+  subtitulo: seleccion.size + ' paradas · salida 08:00 desde ' + ALMACEN.nombre,
+  resumen: X.desdeReadouts().concat(X.desdeKv('.kv')),
+  tablas: [X.desdeTbody('#hoja', ['#', 'Parada', 'Tramo (km)', 'Acumulado (km)', 'Llegada'], 'Orden de visita')],
+  nota: 'Las distancias aplican un factor de trama urbana sobre la distancia en línea recta.'
+}));
+</script>
+</body>
+</html>
