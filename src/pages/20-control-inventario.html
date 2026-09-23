@@ -55,8 +55,16 @@
 </div>
 
 <script>
-const { $, el, num, fmt, soles, token, barChart, draw, onThemeChange } = CODE;
+const { $, el, num, fmt, soles, token, barChart, draw, onThemeChange, guardarEstado, leerEstado } = CODE;
 const { PRODUCTOS } = DATOS;
+
+// El inventario en sí (stock, costo, rotación) es el catálogo sintético — no lo
+// edita esta pantalla. Lo único que el usuario ajusta son los 5 parámetros del
+// análisis, y eso sí se recuerda entre sesiones.
+const PARAMS = ['#lt', '#servicio', '#pedido', '#mant', '#varia'];
+const guardados = leerEstado('inventario-params', null);
+if (guardados) PARAMS.forEach(s => { if (guardados[s] !== undefined) $(s).value = guardados[s]; });
+function persistirParams() { guardarEstado('inventario-params', Object.fromEntries(PARAMS.map(s => [s, $(s).value]))); }
 
 function analizar() {
   const lt = num($('#lt').value, 7);
@@ -131,7 +139,7 @@ function render() {
   }));
 }
 
-['#lt', '#servicio', '#pedido', '#mant', '#varia'].forEach(s => $(s).addEventListener('input', render));
+PARAMS.forEach(s => $(s).addEventListener('input', () => { persistirParams(); render(); }));
 onThemeChange(render);
 render();
 

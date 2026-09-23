@@ -27,6 +27,24 @@
   const num = (v, fallback) => { const n = parseFloat(v); return Number.isFinite(n) ? n : (fallback || 0); };
 
   /**
+   * Persistencia real en localStorage para las demos con estado editable (CRM,
+   * inventario, punto de venta, catálogo…): antes vivían solo en memoria y
+   * volvían al estado de fábrica al recargar. guardarEstado/leerEstado envuelven
+   * JSON.parse/stringify con manejo de errores (localStorage puede fallar en
+   * navegación privada o con el storage lleno; ahí la demo sigue funcionando,
+   * simplemente no recuerda entre sesiones).
+   */
+  function guardarEstado(clave, datos) {
+    try { localStorage.setItem('code-' + clave, JSON.stringify(datos)); } catch (e) {}
+  }
+  function leerEstado(clave, porDefecto) {
+    try {
+      const crudo = localStorage.getItem('code-' + clave);
+      return crudo === null ? porDefecto : JSON.parse(crudo);
+    } catch (e) { return porDefecto; }
+  }
+
+  /**
    * Las calculadoras ya no traen valores de ejemplo precargados: abren en blanco
    * y calculan recién cuando el usuario terminó de llenar los campos que importan.
    * completos(['#a','#b']) dice si todos esos campos (inputs numéricos; los
@@ -351,5 +369,5 @@
     initThemeToggle(); announceReadouts(); initChartLightbox();
   }
 
-  global.CODE = { $, $$, el, clamp, num, completos, fmt, soles, pct, token, bindRange, lineChart, barChart, draw, logger, onThemeChange, svgEl };
+  global.CODE = { $, $$, el, clamp, num, completos, guardarEstado, leerEstado, fmt, soles, pct, token, bindRange, lineChart, barChart, draw, logger, onThemeChange, svgEl };
 })(window);

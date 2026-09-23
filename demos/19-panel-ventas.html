@@ -82,8 +82,13 @@
 <script src="../assets/exportar.js"></script>
 <script src="../assets/datos-comercial.js"></script>
 <script>
-const { $, el, fmt, soles, token, lineChart, barChart, draw, onThemeChange } = CODE;
+const { $, el, fmt, soles, token, lineChart, barChart, draw, onThemeChange, guardarEstado, leerEstado } = CODE;
 const { PRODUCTOS, MESES, VENDEDORES, ventasMensuales } = DATOS;
+
+// El panel es de solo lectura sobre datos sintéticos; lo único que vale la pena
+// recordar entre visitas son los filtros que el usuario dejó elegidos.
+const FILTROS = ['#vend', '#linea', '#periodo'];
+const filtrosGuardados = leerEstado('panel-ventas-filtros', null);
 
 const DATA = ventasMensuales();
 const LINEAS = Array.from(new Set(DATA.map(d => d.linea)));
@@ -161,7 +166,11 @@ $('#vend').appendChild(el('option', { value: '', text: 'Todos' }));
 VENDEDORES.forEach(v => $('#vend').appendChild(el('option', { value: v, text: v })));
 $('#linea').appendChild(el('option', { value: '', text: 'Todas' }));
 LINEAS.forEach(l => $('#linea').appendChild(el('option', { value: l, text: l })));
-['#vend', '#linea', '#periodo'].forEach(s => $(s).addEventListener('input', render));
+if (filtrosGuardados) FILTROS.forEach(s => { if (filtrosGuardados[s] !== undefined) $(s).value = filtrosGuardados[s]; });
+FILTROS.forEach(s => $(s).addEventListener('input', () => {
+  guardarEstado('panel-ventas-filtros', Object.fromEntries(FILTROS.map(k => [k, $(k).value])));
+  render();
+}));
 onThemeChange(render);
 render();
 

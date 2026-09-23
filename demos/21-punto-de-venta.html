@@ -106,7 +106,7 @@
 <script src="../assets/exportar.js"></script>
 
 <script>
-const { $, $$, el, num, fmt, soles } = CODE;
+const { $, $$, el, num, fmt, soles, guardarEstado, leerEstado } = CODE;
 
 const CARTA = [
   ['Sánguches', 'Pan con chicharrón', 14.0], ['Sánguches', 'Butifarra criolla', 12.5],
@@ -123,11 +123,16 @@ const CARTA = [
 const CATEGORIAS = Array.from(new Set(CARTA.map(p => p.categoria)));
 let categoria = CATEGORIAS[0];
 
-const mesas = [
+// Las comandas ya no se pierden al recargar: se guardan en localStorage y se
+// restauran tal como quedaron. Solo si nunca se guardó nada (primera visita)
+// arranca con la mesa 1 ocupada, a modo de ejemplo de cómo se ve una comanda.
+const GUARDADO_SALON = leerEstado('pos-salon', null);
+const mesas = GUARDADO_SALON ? GUARDADO_SALON.mesas : [
   { id: 1, lineas: [{ nombre: 'Pan con chicharrón', precio: 14, cant: 2, nota: 'sin cebolla' }, { nombre: 'Chicha morada 1/2 L', precio: 6, cant: 2, nota: '' }] },
   { id: 2, lineas: [] }, { id: 3, lineas: [] }, { id: 4, lineas: [] }, { id: 5, lineas: [] }
 ];
-let mesaActiva = 1, medio = 'efectivo';
+let mesaActiva = GUARDADO_SALON ? GUARDADO_SALON.mesaActiva : 1, medio = 'efectivo';
+function persistirSalon() { guardarEstado('pos-salon', { mesas, mesaActiva }); }
 
 const mesa = () => mesas.find(m => m.id === mesaActiva);
 const totalMesa = m => m.lineas.reduce((s, l) => s + l.precio * l.cant, 0);
@@ -187,7 +192,7 @@ function pintarComanda() {
 
   m.lineas.forEach((l, i) => {
     const nota = el('input', { type: 'text', value: l.nota, placeholder: 'nota para cocina', 'aria-label': 'nota ' + l.nombre, style: 'margin-top:6px;font-size:12px' });
-    nota.addEventListener('input', () => { l.nota = nota.value; });
+    nota.addEventListener('input', () => { l.nota = nota.value; persistirSalon(); });
     tb.appendChild(el('tr', null, [
       el('td', { style: 'white-space:normal;min-width:150px' }, [el('div', { text: l.nombre }), nota]),
       el('td.num', null, el('div.row', { style: 'gap:4px;flex-wrap:nowrap;justify-content:flex-end' }, [
@@ -216,7 +221,7 @@ function pintarComanda() {
   $('#cajaEfectivo').hidden = medio !== 'efectivo';
 }
 
-function render() { pintarMesas(); pintarComanda(); }
+function render() { pintarMesas(); pintarComanda(); persistirSalon(); }
 
 $('#nueva').addEventListener('click', () => {
   mesas.push({ id: mesas.length + 1, lineas: [] });

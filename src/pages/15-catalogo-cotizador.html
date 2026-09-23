@@ -70,10 +70,14 @@
 </section>
 
 <script>
-const { $, el, num, fmt, soles } = CODE;
+const { $, el, num, fmt, soles, guardarEstado, leerEstado } = CODE;
 const { PRODUCTOS, CLIENTES } = DATOS;
 
-const carrito = new Map();
+// El carrito ya no se pierde al recargar. Se guarda como pares [sku, cantidad]
+// porque un Map no serializa directo a JSON.
+const CARRITO_GUARDADO = leerEstado('catalogo-carrito', null);
+const carrito = new Map(CARRITO_GUARDADO || []);
+function persistirCarrito() { guardarEstado('catalogo-carrito', Array.from(carrito.entries())); }
 
 function precioPorCantidad(p, cant) {
   if (cant >= 50) return p.mayorista * 0.96;
@@ -112,6 +116,7 @@ function pintarCatalogo() {
       const c = Math.max(0, Math.round(num(cant.value, 0)));
       c > 0 ? carrito.set(p.sku, c) : carrito.delete(p.sku);
       cant.value = c;
+      persistirCarrito();
       pintarCarrito();
     };
     cant.addEventListener('input', agregar);
@@ -149,7 +154,7 @@ function pintarCarrito() {
       el('td.num', { text: cant }),
       el('td.num', { text: fmt(unit, 2) }),
       el('td.num', { text: fmt(importe, 2) }),
-      el('td', null, el('button.sm.ghost', { text: '✕', onclick: () => { carrito.delete(p.sku); pintarCatalogo(); pintarCarrito(); } }))
+      el('td', null, el('button.sm.ghost', { text: '✕', onclick: () => { carrito.delete(p.sku); persistirCarrito(); pintarCatalogo(); pintarCarrito(); } }))
     ]));
   });
 
@@ -217,11 +222,13 @@ CLIENTES.forEach(c => $('#cliente').appendChild(el('option', { value: c.nombre, 
 
 ['#q', '#linea', '#marca', '#orden'].forEach(s => $(s).addEventListener('input', pintarCatalogo));
 $('#imprimir').addEventListener('click', documento);
-$('#vaciar').addEventListener('click', () => { carrito.clear(); $('#doc').hidden = true; pintarCatalogo(); pintarCarrito(); });
+$('#vaciar').addEventListener('click', () => { carrito.clear(); persistirCarrito(); $('#doc').hidden = true; pintarCatalogo(); pintarCarrito(); });
 
-carrito.set('EMB-101', 24);
-carrito.set('LAC-403', 12);
-carrito.set('EMB-302', 8);
+if (!CARRITO_GUARDADO) {
+  carrito.set('EMB-101', 24);
+  carrito.set('LAC-403', 12);
+  carrito.set('EMB-302', 8);
+}
 pintarCatalogo();
 pintarCarrito();
 
