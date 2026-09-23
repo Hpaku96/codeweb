@@ -19,8 +19,8 @@
       <h2>Especificación</h2>
       <fieldset>
         <div class="cols" style="gap:12px">
-          <div class="field"><label for="fc">f'c (kg/cm²)</label><input type="number" id="fc" value="210" step="10" min="100"></div>
-          <div class="field"><label for="sd">Desv. estándar s</label><input type="number" id="sd" value="0" step="5" min="0"><span class="hint">0 = sin registro histórico</span></div>
+          <div class="field"><label for="fc">f'c (kg/cm²)</label><input type="number" id="fc" placeholder="p. ej. 210" step="10" min="100"></div>
+          <div class="field"><label for="sd">Desv. estándar s</label><input type="number" id="sd" placeholder="0 si no hay" step="5" min="0"><span class="hint">0 = sin registro histórico</span></div>
         </div>
         <div class="field">
           <label for="slump">Asentamiento</label>
@@ -45,14 +45,14 @@
       <h2>Caracterización de agregados</h2>
       <fieldset>
         <div class="cols" style="gap:12px">
-          <div class="field"><label for="mf">Módulo de fineza arena</label><input type="number" id="mf" value="2.70" step="0.05" min="2.2" max="3.2"></div>
-          <div class="field"><label for="puv">PUV varillado piedra (kg/m³)</label><input type="number" id="puv" value="1560" step="10"></div>
-          <div class="field"><label for="peg">Peso específico piedra</label><input type="number" id="peg" value="2.65" step="0.01"></div>
-          <div class="field"><label for="pea">Peso específico arena</label><input type="number" id="pea" value="2.60" step="0.01"></div>
-          <div class="field"><label for="hg">Humedad piedra (%)</label><input type="number" id="hg" value="1.0" step="0.1"></div>
-          <div class="field"><label for="ag">Absorción piedra (%)</label><input type="number" id="ag" value="0.5" step="0.1"></div>
-          <div class="field"><label for="ha">Humedad arena (%)</label><input type="number" id="ha" value="4.0" step="0.1"></div>
-          <div class="field"><label for="aa">Absorción arena (%)</label><input type="number" id="aa" value="1.0" step="0.1"></div>
+          <div class="field"><label for="mf">Módulo de fineza arena</label><input type="number" id="mf" placeholder="p. ej. 2.70" step="0.05" min="2.2" max="3.2"></div>
+          <div class="field"><label for="puv">PUV varillado piedra (kg/m³)</label><input type="number" id="puv" placeholder="p. ej. 1560" step="10"></div>
+          <div class="field"><label for="peg">Peso específico piedra</label><input type="number" id="peg" placeholder="p. ej. 2.65" step="0.01"></div>
+          <div class="field"><label for="pea">Peso específico arena</label><input type="number" id="pea" placeholder="p. ej. 2.60" step="0.01"></div>
+          <div class="field"><label for="hg">Humedad piedra (%)</label><input type="number" id="hg" placeholder="p. ej. 1.0" step="0.1"></div>
+          <div class="field"><label for="ag">Absorción piedra (%)</label><input type="number" id="ag" placeholder="p. ej. 0.5" step="0.1"></div>
+          <div class="field"><label for="ha">Humedad arena (%)</label><input type="number" id="ha" placeholder="p. ej. 4.0" step="0.1"></div>
+          <div class="field"><label for="aa">Absorción arena (%)</label><input type="number" id="aa" placeholder="p. ej. 1.0" step="0.1"></div>
         </div>
       </fieldset>
     </section>
@@ -86,7 +86,8 @@
 </div>
 
 <script>
-const { $, el, num, fmt, token, draw, svgEl, onThemeChange } = CODE;
+const { $, el, num, completos, fmt, token, draw, svgEl, onThemeChange } = CODE;
+const CAMPOS = ['#fc', '#sd', '#mf', '#puv', '#peg', '#pea', '#hg', '#ag', '#ha', '#aa'];
 
 const AGUA_SIN = [[207,199,190,179,166,154],[228,216,205,193,181,169],[243,228,216,202,190,178]];
 const AGUA_CON = [[181,175,168,160,150,142],[202,193,184,175,165,157],[216,205,197,184,174,166]];
@@ -120,7 +121,15 @@ function bSobreB0(tmn, mf) {
   return fila[fila.length - 1];
 }
 
+function vaciar() {
+  $('#fcr').textContent = '—'; $('#ac').textContent = '—';
+  $('#dosif').textContent = '';
+  $('#bolsas').textContent = '—'; $('#rend').textContent = '—';
+  $('#barra').innerHTML = '<p class="note">Completa la especificación y los agregados para ver la dosificación.</p>';
+}
+
 function calcular() {
+  if (!completos(CAMPOS)) { vaciar(); return; }
   const fc = num($('#fc').value, 210), s = num($('#sd').value, 0);
   const slump = +$('#slump').value, tmn = +$('#tmn').value;
   const conAire = $('#aire').value === 'si';

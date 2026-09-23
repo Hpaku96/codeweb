@@ -69,10 +69,8 @@
 <script>
 const { $, el, num, fmt, token, draw, svgEl, onThemeChange } = CODE;
 
-let lados = [
-  { az: 45.0, d: 120.00 }, { az: 135.0, d: 100.00 }, { az: 210.0, d: 140.00 },
-  { az: 300.0, d: 90.00 }, { az: 353.0, d: 62.60 }
-];
+// Arranca sin lados: el usuario arma su propia poligonal con "+ Lado".
+let lados = [];
 
 const rad = g => g * Math.PI / 180;
 function dms(g) {
@@ -99,7 +97,14 @@ function pintarLados() {
 }
 
 function calcular() {
-  if (lados.length < 3) return;
+  if (lados.length < 3) {
+    ['#err', '#prec', '#eN', '#eE', '#azErr', '#per', '#area', '#areaHa'].forEach(s => { $(s).textContent = '—'; });
+    $('#perim').textContent = lados.length + ' lado' + (lados.length === 1 ? '' : 's') + ' — faltan mínimo 3';
+    const v = $('#verdict'); v.className = 'chip'; v.textContent = 'Agrega al menos 3 lados';
+    $('#tCoord tbody').textContent = '';
+    $('#dibujo').innerHTML = '<p class="note">Agrega al menos 3 lados para trazar la poligonal.</p>';
+    return;
+  }
   const proy = lados.map((l, i) => {
     const dn = l.d * Math.cos(rad(l.az)), de = l.d * Math.sin(rad(l.az));
     const cn = $('#dn' + i), ce = $('#de' + i);

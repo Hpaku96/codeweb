@@ -45,16 +45,16 @@
     <section class="panel">
       <h2>Condiciones del crédito</h2>
       <fieldset>
-        <div class="field"><label for="monto">Monto financiado (S/)</label><input type="number" id="monto" value="24000" step="500" min="100"></div>
-        <div class="field"><label for="tea">Tasa efectiva anual (%)</label><input type="number" id="tea" value="34.5" step="0.1" min="0"></div>
-        <div class="field"><label for="n">Plazo (meses)</label><input type="number" id="n" value="24" step="1" min="1" max="120"></div>
+        <div class="field"><label for="monto">Monto financiado (S/)</label><input type="number" id="monto" placeholder="p. ej. 24 000" step="500" min="100"></div>
+        <div class="field"><label for="tea">Tasa efectiva anual (%)</label><input type="number" id="tea" placeholder="p. ej. 34.5" step="0.1" min="0"></div>
+        <div class="field"><label for="n">Plazo (meses)</label><input type="number" id="n" placeholder="p. ej. 24" step="1" min="1" max="120"></div>
         <div class="field">
           <label for="sistema">Sistema de amortización</label>
           <select id="sistema"><option value="frances">Francés — cuota constante</option><option value="aleman">Alemán — amortización constante</option></select>
         </div>
         <div class="cols" style="gap:12px">
-          <div class="field"><label for="seguro">Desgravamen mensual (%)</label><input type="number" id="seguro" value="0.045" step="0.005" min="0"></div>
-          <div class="field"><label for="portes">Portes mensuales (S/)</label><input type="number" id="portes" value="9" step="1" min="0"></div>
+          <div class="field"><label for="seguro">Desgravamen mensual (%)</label><input type="number" id="seguro" placeholder="p. ej. 0.045" step="0.005" min="0"></div>
+          <div class="field"><label for="portes">Portes mensuales (S/)</label><input type="number" id="portes" placeholder="p. ej. 9" step="1" min="0"></div>
         </div>
       </fieldset>
     </section>
@@ -95,7 +95,8 @@
 <script src="../assets/exportar.js"></script>
 
 <script>
-const { $, el, num, fmt, soles, token, draw, svgEl, onThemeChange } = CODE;
+const { $, el, num, completos, fmt, soles, token, draw, svgEl, onThemeChange } = CODE;
+const CAMPOS = ['#monto', '#tea', '#n', '#seguro', '#portes'];
 
 function cronograma() {
   const P = num($('#monto').value, 0);
@@ -137,7 +138,14 @@ function tcea(filas, P) {
   return Math.pow(1 + i, 12) - 1;
 }
 
+function vaciar() {
+  ['#cuota', '#tcea', '#tem', '#totInt', '#totSeg', '#totPag', '#sobre'].forEach(s => { $(s).textContent = '—'; });
+  $('#crono').textContent = '';
+  $('#graf').innerHTML = '<p class="note">Completa las condiciones del crédito para ver el cronograma.</p>';
+}
+
 function render() {
+  if (!completos(CAMPOS)) { vaciar(); return; }
   const { filas, tem, P } = cronograma();
   const totInt = filas.reduce((s, r) => s + r.interes, 0);
   const totSeg = filas.reduce((s, r) => s + r.cargo, 0);

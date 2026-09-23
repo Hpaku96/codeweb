@@ -18,7 +18,7 @@
   <div class="row" style="gap:16px;align-items:flex-end">
     <div class="field" style="min-width:150px">
       <label for="L">Luz L (m)</label>
-      <input type="number" id="L" value="6" min="0.5" step="0.5">
+      <input type="number" id="L" placeholder="p. ej. 6" min="0.5" step="0.5">
     </div>
     <div class="field" style="min-width:210px">
       <label for="tipo">Apoyos</label>
@@ -29,7 +29,7 @@
     </div>
     <div class="field" style="min-width:170px">
       <label for="sigma">σ admisible (kg/cm²)</label>
-      <input type="number" id="sigma" value="1700" min="50" step="50">
+      <input type="number" id="sigma" placeholder="p. ej. 1700" min="50" step="50">
     </div>
   </div>
 </section>
@@ -80,12 +80,11 @@
 </div>
 
 <script>
-const { $, el, num, fmt, token, lineChart, draw, svgEl, onThemeChange } = CODE;
+const { $, el, num, completos, fmt, token, lineChart, draw, svgEl, onThemeChange } = CODE;
 
-let cargas = [
-  { tipo: 'P', valor: 4, a: 2, b: 2 },
-  { tipo: 'W', valor: 1.5, a: 0, b: 6 }
-];
+// Arranca sin cargas: el usuario arma su propia viga con "+ Carga puntual" / "+ Carga
+// distribuida" en vez de partir de un ejemplo ya cargado.
+let cargas = [];
 
 function pintarCargas() {
   const tb = $('#cargas tbody');
@@ -129,7 +128,15 @@ function tramo(c, x) {
   return { largo: hasta - ini, cg: (ini + hasta) / 2 };
 }
 
+function vaciar() {
+  ['#Ra', '#Rb', '#Mmax', '#Vmax', '#xM', '#W', '#S', '#perfil'].forEach(s => { $(s).textContent = '—'; });
+  $('#gV').innerHTML = ''; $('#gM').innerHTML = ''; $('#viga').innerHTML = '';
+  const p = el('p.note', { text: 'Completa la luz y el σ admisible para ver los diagramas.' });
+  $('#viga').appendChild(p);
+}
+
 function calcular() {
+  if (!completos(['#L', '#sigma'])) { vaciar(); return; }
   const L = Math.max(0.5, num($('#L').value, 6));
   const tipo = $('#tipo').value;
   const activas = cargas.filter(c => c.a <= L + 1e-9);

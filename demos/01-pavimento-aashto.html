@@ -47,7 +47,7 @@
       <fieldset>
         <div class="field">
           <label for="w18">W₁₈ — ejes equivalentes de 8.2 t en el periodo</label>
-          <input type="number" id="w18" value="5200000" min="10000" step="10000">
+          <input type="number" id="w18" placeholder="p. ej. 5 200 000" min="10000" step="10000">
         </div>
         <div class="field">
           <label for="rel">Confiabilidad R</label>
@@ -62,17 +62,17 @@
         </div>
         <div class="field">
           <label for="so">Desviación estándar combinada S₀</label>
-          <input type="number" id="so" value="0.45" step="0.01" min="0.3" max="0.5">
+          <input type="number" id="so" placeholder="0.30–0.50" step="0.01" min="0.3" max="0.5">
           <span class="hint">0.40–0.50 para pavimento flexible.</span>
         </div>
         <div class="field">
           <label for="psi">Pérdida de serviciabilidad ΔPSI</label>
-          <input type="number" id="psi" value="1.9" step="0.1" min="0.5" max="3">
+          <input type="number" id="psi" placeholder="p. ej. 1.9" step="0.1" min="0.5" max="3">
           <span class="hint">p₀ inicial 4.2 · p_t final 2.3 → ΔPSI 1.9</span>
         </div>
         <div class="field">
           <label for="mr">Módulo resiliente de la subrasante Mr (psi)</label>
-          <input type="number" id="mr" value="11000" step="500" min="1500">
+          <input type="number" id="mr" placeholder="p. ej. 11 000" step="500" min="1500">
           <span class="hint">CBR 8 % ≈ 11 000 psi (Mr ≈ 1500 × CBR)</span>
         </div>
       </fieldset>
@@ -127,7 +127,8 @@
 <script src="../assets/exportar.js"></script>
 
 <script>
-const { $, el, num, fmt, token, lineChart, draw, onThemeChange } = CODE;
+const { $, el, num, completos, fmt, token, lineChart, draw, onThemeChange } = CODE;
+const CAMPOS = ['#w18', '#so', '#psi', '#mr'];
 
 const capas = [
   { nombre: 'Carpeta asfáltica en caliente', a: 0.44, m: 1.00, e: 10, fijo: true },
@@ -173,7 +174,16 @@ function pintarCapas() {
   });
 }
 
+function vaciar() {
+  ['#snReq', '#snProv', '#zr', '#logw', '#holgura', '#iters'].forEach(s => { $(s).textContent = '—'; });
+  $('#espesorTotal').textContent = '—';
+  const v = $('#veredicto'); v.className = 'chip'; v.textContent = 'Completa los datos de tránsito';
+  capas.forEach((c, i) => { const cell = $('#sn' + i); if (cell) cell.textContent = '—'; });
+  $('#graf').innerHTML = '<p class="note">Completa los datos de tránsito y confiabilidad para ver la curva SN requerido.</p>';
+}
+
 function calcular() {
+  if (!completos(CAMPOS)) { vaciar(); return; }
   const w18 = num($('#w18').value, 1e6);
   const zr = num($('#rel').value, -1.282);
   const so = num($('#so').value, 0.45);

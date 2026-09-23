@@ -59,8 +59,8 @@
     <section class="panel">
       <h2>Límites de Atterberg</h2>
       <div class="cols" style="gap:12px">
-        <div class="field"><label for="ll">Límite líquido LL</label><input type="number" id="ll" value="24" min="0" step="1"></div>
-        <div class="field"><label for="lp">Límite plástico LP</label><input type="number" id="lp" value="18" min="0" step="1"></div>
+        <div class="field"><label for="ll">Límite líquido LL</label><input type="number" id="ll" placeholder="p. ej. 24" min="0" step="1"></div>
+        <div class="field"><label for="lp">Límite plástico LP</label><input type="number" id="lp" placeholder="p. ej. 18" min="0" step="1"></div>
       </div>
       <p class="note" style="margin-top:12px">IP = LL − LP = <span id="ip">—</span>. Se usa para separar los finos limosos de los arcillosos y para el índice de grupo.</p>
     </section>
@@ -97,12 +97,15 @@
 <script src="../assets/exportar.js"></script>
 
 <script>
-const { $, el, num, fmt, token, lineChart, draw, onThemeChange } = CODE;
+const { $, el, num, completos, fmt, token, lineChart, draw, onThemeChange } = CODE;
 
+// Los tamices y sus aberturas en mm son el juego de mallas real del ensayo: eso no
+// es "ejemplo", es fijo. El peso retenido en cada uno sí lo era — ahora arranca en
+// 0 (muestra vacía) y el usuario ingresa el resultado real de su ensayo.
 const BASE = [
-  ['2"', 50, 0], ['1 1/2"', 37.5, 60], ['1"', 25, 140], ['3/4"', 19, 180],
-  ['1/2"', 12.5, 220], ['3/8"', 9.5, 160], ['N° 4', 4.75, 280], ['N° 10', 2.0, 250],
-  ['N° 40', 0.425, 320], ['N° 100', 0.15, 180], ['N° 200', 0.075, 130], ['Fondo', 0.01, 80]
+  ['2"', 50, 0], ['1 1/2"', 37.5, 0], ['1"', 25, 0], ['3/4"', 19, 0],
+  ['1/2"', 12.5, 0], ['3/8"', 9.5, 0], ['N° 4', 4.75, 0], ['N° 10', 2.0, 0],
+  ['N° 40', 0.425, 0], ['N° 100', 0.15, 0], ['N° 200', 0.075, 0], ['Fondo', 0.01, 0]
 ];
 let tamices = BASE.map(t => ({ nombre: t[0], mm: t[1], ret: t[2] }));
 
@@ -169,10 +172,19 @@ function clasificarAASHTO(p10, p40, p200, ll, ip) {
   return [ip <= ll - 30 ? 'A-7-5' : 'A-7-6', 'Arcilla de alta plasticidad — subrasante mala'];
 }
 
+function vaciar(total) {
+  $('#total').textContent = total > 0 ? 'Muestra ' + fmt(total, 0) + ' g' : '—';
+  tamices.forEach((t, i) => { const cell = $('#p' + i); if (cell) cell.textContent = '—'; });
+  $('#ip').textContent = '—';
+  ['#sucs', '#aashto', '#ds', '#cu', '#cc', '#fracciones', '#ig'].forEach(s => { $(s).textContent = '—'; });
+  $('#sucsTxt').textContent = '—'; $('#aashtoTxt').textContent = '—';
+  $('#graf').innerHTML = '<p class="note">Completa los pesos retenidos y los límites de Atterberg para ver la curva granulométrica.</p>';
+}
+
 function calcular() {
   const total = tamices.reduce((s, t) => s + t.ret, 0);
+  if (total <= 0 || !completos(['#ll', '#lp'])) { vaciar(total); return; }
   $('#total').textContent = 'Muestra ' + fmt(total, 0) + ' g';
-  if (total <= 0) return;
 
   let acum = 0;
   const curva = [];

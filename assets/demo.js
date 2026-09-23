@@ -26,6 +26,22 @@
   const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
   const num = (v, fallback) => { const n = parseFloat(v); return Number.isFinite(n) ? n : (fallback || 0); };
 
+  /**
+   * Las calculadoras ya no traen valores de ejemplo precargados: abren en blanco
+   * y calculan recién cuando el usuario terminó de llenar los campos que importan.
+   * completos(['#a','#b']) dice si todos esos campos (inputs numéricos; los
+   * <select> siempre cuentan como completos, no pueden quedar vacíos) tienen un
+   * valor utilizable.
+   */
+  function completos(selectors) {
+    return selectors.every(s => {
+      const node = $(s);
+      if (!node) return false;
+      if (node.tagName === 'SELECT') return true;
+      return node.value !== '' && Number.isFinite(parseFloat(node.value));
+    });
+  }
+
   /** 1234.5 -> "1 234,5" con separador de miles fino */
   function fmt(v, decimals) {
     if (!Number.isFinite(v)) return '—';
@@ -212,5 +228,5 @@
     initThemeToggle(); announceReadouts();
   }
 
-  global.CODE = { $, $$, el, clamp, num, fmt, soles, pct, token, bindRange, lineChart, barChart, draw, logger, onThemeChange, svgEl };
+  global.CODE = { $, $$, el, clamp, num, completos, fmt, soles, pct, token, bindRange, lineChart, barChart, draw, logger, onThemeChange, svgEl };
 })(window);

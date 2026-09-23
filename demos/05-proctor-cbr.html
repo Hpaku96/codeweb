@@ -53,7 +53,7 @@
       <button class="sm" id="addP">+ Punto</button>
       <div class="field" style="margin-left:auto;min-width:130px">
         <label for="gs">Gravedad específica G<sub>s</sub></label>
-        <input type="number" id="gs" value="2.68" step="0.01" min="2.2" max="3">
+        <input type="number" id="gs" placeholder="p. ej. 2.68" step="0.01" min="2.2" max="3">
       </div>
     </div>
     <div class="cols" style="gap:10px;margin-top:14px">
@@ -73,7 +73,7 @@
     </div>
     <div class="field" style="margin-top:12px;max-width:220px">
       <label for="area">Área del pistón (cm²)</label>
-      <input type="number" id="area" value="19.35" step="0.01">
+      <input type="number" id="area" placeholder="p. ej. 19.35" step="0.01">
     </div>
     <div class="cols" style="gap:10px;margin-top:14px">
       <div class="readout"><span class="k">CBR a 0.1"</span><span class="v" id="cbr1">—</span><span class="u">%</span></div>
@@ -93,16 +93,13 @@
 <script src="../assets/exportar.js"></script>
 
 <script>
-const { $, el, num, fmt, token, lineChart, draw, onThemeChange } = CODE;
+const { $, el, num, completos, fmt, token, lineChart, draw, onThemeChange } = CODE;
 
-let proctor = [
-  { w: 6, gh: 1.95 }, { w: 8, gh: 2.08 }, { w: 10, gh: 2.18 },
-  { w: 12, gh: 2.19 }, { w: 14, gh: 2.13 }
-];
-const cbr = [
-  { p: 0.025, c: 45 }, { p: 0.05, c: 90 }, { p: 0.075, c: 135 }, { p: 0.10, c: 178 },
-  { p: 0.15, c: 245 }, { p: 0.20, c: 300 }, { p: 0.30, c: 380 }, { p: 0.40, c: 430 }, { p: 0.50, c: 470 }
-];
+// El ensayo Proctor arranca sin puntos: el usuario los agrega con "+ Punto". Los
+// niveles de penetración del CBR sí son fijos —los define el ensayo, no son un
+// "ejemplo"— pero la carga registrada en cada uno arranca vacía.
+let proctor = [];
+const cbr = [0.025, 0.05, 0.075, 0.10, 0.15, 0.20, 0.30, 0.40, 0.50].map(p => ({ p, c: null }));
 
 /* Ajuste cuadrático y = ax² + bx + c por mínimos cuadrados (ecuaciones normales 3×3). */
 function ajusteCuadratico(pts) {
@@ -163,7 +160,10 @@ function calcular() {
     return { x: p.w, y: gd };
   }).filter(p => Number.isFinite(p.y) && p.y > 0);
 
-  if (pts.length >= 3) {
+  if (pts.length < 3) {
+    $('#gdmax').textContent = '—'; $('#ocs').textContent = '—';
+    $('#gProctor').innerHTML = '<p class="note">Agrega al menos 3 puntos del ensayo Proctor para ajustar la curva.</p>';
+  } else {
     const { a, b, c } = ajusteCuadratico(pts);
     const wopt = -b / (2 * a);
     const gdmax = a * wopt * wopt + b * wopt + c;
@@ -187,6 +187,14 @@ function calcular() {
       xLabel: 'Contenido de humedad w (%) — línea punteada: cero vacíos de aire',
       yLabel: 'γ seco (g/cm³)', xFmt: v => fmt(v, 0), yFmt: v => fmt(v, 2)
     }));
+  }
+
+  cbr.forEach((d, i) => { const cell = $('#e' + i); if (cell && !Number.isFinite(d.c)) cell.textContent = '—'; });
+  if (!completos(['#area']) || !cbr.every(d => Number.isFinite(d.c))) {
+    $('#cbr1').textContent = '—'; $('#cbrd').textContent = '—';
+    const av = $('#aviso'); av.className = 'chip'; av.textContent = 'Completa el área del pistón y la carga de los 9 puntos';
+    $('#gCbr').innerHTML = '<p class="note">Completa la curva esfuerzo/penetración para ver el gráfico.</p>';
+    return;
   }
 
   const area = num($('#area').value, 19.35);
