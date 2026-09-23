@@ -113,9 +113,11 @@ const PRESETS = {
   vacio:  {}
 };
 
-let tempo = 96, swing = 18, volumen = 0.8;
+let tempo = 96, swing = 18, volumen = 0.8, delayMix = 0, reverbMix = 0;
 let padSel = 0, tocando = false, paso = 0, proximo = 0, temporizador = null, pasoVisible = -1;
-let maestro = null, grabadora = null, grabando = false, ultimaGrabacion = 0;
+let maestro = null, salidaFinal = null, grabadora = null, grabando = false, ultimaGrabacion = 0;
+let delayNodo = null, delayEnvio = null, delayRealim = null, delaySalida = null;
+let convolucion = null, reverbEnvio = null, reverbSalida = null;
 const LOOKAHEAD = 0.1, INTERVALO = 25;
 
 /* ================= síntesis ================= */
@@ -234,8 +236,31 @@ async function prepararAudio() {
   if (!maestro) {
     maestro = c.createGain();
     maestro.gain.value = volumen;
-    maestro.connect(c.destination);
-    grabadora = G.grabadora(c, maestro);
+
+    // Bus de salida: la mezcla seca (maestro) más los envíos de delay y
+    // reverb, todo junto para que tanto los parlantes como la grabación
+    // capturen el efecto — no solo el sonido seco de los pads.
+    salidaFinal = c.createGain();
+    maestro.connect(salidaFinal);
+
+    delayEnvio = c.createGain(); delayEnvio.gain.value = delayMix;
+    delayNodo = c.createDelay(1.5);
+    delayNodo.delayTime.value = duracionPaso() * 3; // ≈ corchea con puntillo al tempo actual
+    delayRealim = c.createGain(); delayRealim.gain.value = 0.32;
+    delaySalida = c.createGain(); delaySalida.gain.value = 0.9;
+    maestro.connect(delayEnvio); delayEnvio.connect(delayNodo);
+    delayNodo.connect(delayRealim); delayRealim.connect(delayNodo);
+    delayNodo.connect(delaySalida); delaySalida.connect(salidaFinal);
+
+    reverbEnvio = c.createGain(); reverbEnvio.gain.value = reverbMix;
+    convolucion = c.createConvolver();
+    convolucion.buffer = A.impulso(c, 1.8, 2.6, 0.4);
+    reverbSalida = c.createGain(); reverbSalida.gain.value = 0.9;
+    maestro.connect(reverbEnvio); reverbEnvio.connect(convolucion);
+    convolucion.connect(reverbSalida); reverbSalida.connect(salidaFinal);
+
+    salidaFinal.connect(c.destination);
+    grabadora = G.grabadora(c, salidaFinal);
   }
   return c;
 }
@@ -458,7 +483,12 @@ function construir() {
   const perillas = el('div.fila-perillas', null, [
     M.perilla({ nombre: 'Tempo', min: 60, max: 180, valor: tempo, paso: 1,
       formato: v => fmt(v, 0) + ' BPM',
-      onCambio: v => { tempo = v; if (muestra.buffer) recalcularCortes(); pintarLcd(); } }),
+      onCambio: v => {
+        tempo = v;
+        if (muestra.buffer) recalcularCortes();
+        if (delayNodo) delayNodo.delayTime.setTargetAtTime(duracionPaso() * 3, A.ctx().currentTime, 0.05);
+        pintarLcd();
+      } }),
     M.perilla({ nombre: 'Swing', min: 0, max: 60, valor: swing, paso: 1,
       formato: v => fmt(v, 0) + ' %', onCambio: v => { swing = v; pintarLcd(); } }),
     (perillaVol = M.perilla({ nombre: 'Master', min: 0, max: 1, valor: volumen,
@@ -467,6 +497,15 @@ function construir() {
     (perillaTono = M.perilla({ nombre: 'Tune pad', min: -12, max: 12, valor: 0, paso: 0.5,
       formato: v => (v > 0 ? '+' : '') + fmt(v, 1) + ' st',
       onCambio: v => { pads[padSel].tono = v; } }))
+  ]);
+
+  const perillasFx = el('div.fila-perillas', null, [
+    M.perilla({ nombre: 'Delay', min: 0, max: 1, valor: delayMix,
+      formato: v => fmt(v * 100, 0) + ' %',
+      onCambio: v => { delayMix = v; if (delayEnvio) delayEnvio.gain.setTargetAtTime(v, A.ctx().currentTime, 0.05); } }),
+    M.perilla({ nombre: 'Reverb', min: 0, max: 1, valor: reverbMix,
+      formato: v => fmt(v * 100, 0) + ' %',
+      onCambio: v => { reverbMix = v; if (reverbEnvio) reverbEnvio.gain.setTargetAtTime(v, A.ctx().currentTime, 0.05); } })
   ]);
 
   const exportar = el('div.fila-botones', null, [
@@ -485,6 +524,7 @@ function construir() {
 
   panel.appendChild(M.modulo('Transporte', [pantalla, el('div', { style: 'height:12px' }), transporte, el('div', { style: 'height:10px' }), preset], 'sp4'));
   panel.appendChild(M.modulo('Control', [perillas, el('div', { style: 'height:10px' }), el('h3', { text: 'Exportar grabación', style: 'margin-top:4px' }), exportar], 'sp3'));
+  panel.appendChild(M.modulo('FX de salida', [perillasFx], 'sp3'));
 
   /* --- pads --- */
   const rejilla = el('div.pads');
