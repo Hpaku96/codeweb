@@ -62,7 +62,7 @@
 <script src="../assets/grabar.js"></script>
 <script src="../assets/maquina.js"></script>
 <script>
-const { $, el, fmt } = CODE;
+const { $, el, fmt, clamp } = CODE;
 const A = AUDIO, M = MAQUINA, G = GRABAR;
 
 /* ================= modelo ================= */
@@ -216,8 +216,13 @@ function reloj() {
       if (v) disparar(i, cuando, v === 2 ? 1 : 0.62);
     });
     const p = paso;
-    setTimeout(() => { pasoVisible = p; pintarSecuencia(); pintarLcd(); },
-      Math.max(0, (cuando - c.currentTime) * 1000));
+    setTimeout(() => {
+      pasoVisible = p; pintarSecuencia(); pintarLcd();
+      // Los pads responden en tiempo real también cuando los dispara el
+      // secuenciador, no solo al tocarlos: sin esto, el golpe sonaba pero
+      // el pad se quedaba quieto durante la reproducción automática.
+      pads.forEach((pd, i) => { if (patron[i][p]) padsUi[i].destellar(); });
+    }, Math.max(0, (cuando - c.currentTime) * 1000));
     proximo += duracionPaso();
     paso = (paso + 1) % PASOS;
   }
@@ -316,6 +321,7 @@ async function cargarParaTrocear(archivo) {
   muestra.bpm = G.bpmUsable(d.bpm, 70, 180);
   muestra.confianza = d.confianza;
   muestra.inicio = d.inicio;
+  zoomOnda = 1; panOnda = 0; picosClave = '';
   recalcularCortes();
   mensaje('BPM detectado: ' + fmt(muestra.bpm, 1));
 }
@@ -354,6 +360,22 @@ function repartirCortes() {
     padsUi[i].renombrar(pads[i].nombre, pads[i].fuente);
   });
   mensaje('16 cortes repartidos · ×' + fmt(rate, 3));
+}
+
+/** Carga la región completa (hasta 4 compases) como un solo sample en el pad
+    seleccionado, en vez de repartirla en 16 cortes. */
+function cargarRegionAlPad() {
+  if (!muestra.buffer) return;
+  const p = pads[padSel];
+  p.buffer = muestra.buffer;
+  p.offset = muestra.inicio;
+  p.dur = largoRegion();
+  p.rate = muestra.bpm ? muestra.bpm / tempo : 1;
+  p.nombre = muestra.compases + ' compás' + (muestra.compases > 1 ? 'es' : '');
+  p.fuente = muestra.nombre.slice(0, 14);
+  padsUi[padSel].renombrar(p.nombre, p.fuente);
+  disparar(padSel, A.ctx().currentTime, 1);
+  mensaje('Región de ' + muestra.compases + ' compás' + (muestra.compases > 1 ? 'es' : '') + ' en el pad ' + (padSel + 1));
 }
 
 function asignarCorteAlPad(i) {
@@ -507,12 +529,18 @@ function construir() {
     M.botonArchivo({ texto: 'Abrir audio', pie: 'wav, mp3, m4a', id: 'archMuestra', onArchivo: f => f[0] && cargarParaTrocear(f[0]) })
   ].concat(botonesCompas, [
     M.boton({ texto: 'Repartir', pie: 'a los 16 pads', onClick: repartirCortes }),
+    M.boton({ texto: 'Cargar al pad', pie: 'región completa', onClick: cargarRegionAlPad }),
     M.boton({ texto: 'Escuchar', pie: 'la región', onClick: escucharRegion })
   ]));
+  const zoomOndaCtrl = el('div.fila-botones', { style: 'margin-top:8px' }, [
+    M.boton({ texto: '− Zoom', onClick: () => aplicarZoomOnda(1 / 1.6) }),
+    M.boton({ texto: '+ Zoom', onClick: () => aplicarZoomOnda(1.6) }),
+    M.boton({ texto: 'Ver todo', onClick: () => { zoomOnda = 1; panOnda = 0; picosClave = null; pintarOnda(); } })
+  ]);
   panel.appendChild(M.modulo('Make a Sample', [
-    onda, controlesMuestra,
+    onda, controlesMuestra, zoomOndaCtrl,
     el('p', { style: 'margin:10px 0 0;font:500 9px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--m-suave)',
-      text: 'Arrastra sobre la onda para mover la región · toca un corte para asignarlo al pad seleccionado' })
+      text: 'Arrastra para mover la región · toca un corte para asignarlo · rueda o pellizco para zoom' })
   ]));
 
   $('#maquina').appendChild(maquina);
@@ -583,16 +611,42 @@ function pintarLcd() {
 
 /* ---- onda de Make a Sample ---- */
 
-let picos = null;
+// Zoom horizontal sobre la onda: zoomOnda es el factor (1 = ver todo el
+// archivo), panOnda el segundo donde empieza la ventana visible. Ampliar
+// permite ubicar el inicio de la región con más precisión que a ojo sobre
+// el archivo completo.
+let zoomOnda = 1, panOnda = 0;
+let picos = null, picosClave = '';
 
-function calcularPicos(ancho) {
+function ventanaOnda() {
+  const ancho = muestra.buffer ? muestra.buffer.duration / zoomOnda : 0;
+  return { ini: panOnda, fin: panOnda + ancho, ancho };
+}
+
+function aplicarZoomOnda(factor, segCentro) {
+  if (!muestra.buffer) return;
+  const { ini, ancho } = ventanaOnda();
+  const centro = segCentro !== undefined ? segCentro : ini + ancho / 2;
+  zoomOnda = clamp(zoomOnda * factor, 1, 40);
+  const nuevoAncho = muestra.buffer.duration / zoomOnda;
+  const t = ancho > 0 ? (centro - ini) / ancho : 0.5;
+  panOnda = clamp(centro - t * nuevoAncho, 0, Math.max(0, muestra.buffer.duration - nuevoAncho));
+  pintarOnda();
+}
+
+function calcularPicos(ancho, iniSeg, finSeg) {
+  const sr = muestra.buffer.sampleRate;
+  const i0 = clamp(Math.floor(iniSeg * sr), 0, muestra.buffer.length);
+  const i1 = clamp(Math.ceil(finSeg * sr), i0, muestra.buffer.length);
   const d = muestra.buffer.getChannelData(0);
-  const paso = Math.max(1, Math.floor(d.length / ancho));
+  const totalMuestras = Math.max(1, i1 - i0);
+  const paso = Math.max(1, Math.floor(totalMuestras / ancho));
   const out = new Float32Array(ancho);
   for (let x = 0; x < ancho; x++) {
     let max = 0;
+    const base = i0 + x * paso;
     for (let i = 0; i < paso; i++) {
-      const v = Math.abs(d[x * paso + i] || 0);
+      const v = Math.abs(d[base + i] || 0);
       if (v > max) max = v;
     }
     out[x] = max;
@@ -619,9 +673,11 @@ function pintarOnda() {
     return;
   }
 
-  if (!picos || picos.length !== Math.round(w)) picos = calcularPicos(Math.round(w));
+  const { ini: vistaIni, fin: vistaFin } = ventanaOnda();
+  const clave = Math.round(w) + ':' + vistaIni.toFixed(4) + ':' + vistaFin.toFixed(4);
+  if (clave !== picosClave) { picos = calcularPicos(Math.round(w), vistaIni, vistaFin); picosClave = clave; }
 
-  // Onda completa
+  // Onda completa (recortada a la ventana visible)
   g.strokeStyle = 'rgba(125,240,168,.4)';
   g.beginPath();
   for (let x = 0; x < picos.length; x++) {
@@ -631,7 +687,7 @@ function pintarOnda() {
   }
   g.stroke();
 
-  const X = seg => seg / muestra.buffer.duration * w;
+  const X = seg => (seg - vistaIni) / (vistaFin - vistaIni || 1) * w;
   const x0 = X(muestra.inicio), x1 = X(muestra.inicio + largoRegion());
 
   // Zonas fuera de la región, atenuadas
@@ -664,7 +720,7 @@ function pintarOnda() {
 
   g.fillStyle = 'rgba(125,240,168,.75)';
   g.textAlign = 'right';
-  g.fillText(fmt(muestra.buffer.duration, 2) + ' s', w - 6, h - 6);
+  g.fillText(fmt(muestra.buffer.duration, 2) + ' s' + (zoomOnda > 1.02 ? ' · ×' + fmt(zoomOnda, 1) : ''), w - 6, h - 6);
 }
 
 function escucharRegion() {
@@ -688,33 +744,74 @@ seleccionarPad(0);
 pintarLcd();
 pintarOnda();
 
-/* Arrastre sobre la onda: mueve la región; un clic simple asigna el corte. */
+/* Arrastre sobre la onda: mueve la región; un toque quieto asigna el corte;
+   con dos dedos (o rueda del ratón) se hace zoom centrado en el punto tocado.
+   Antes esto solo escuchaba mouse/pointer sin tomar el gesto para sí: en touch,
+   el navegador se lo disputaba como scroll y el pointerup a veces ni llegaba
+   (pointercancel), dejando "arrastrando" trabado y el toque sin efecto. Con
+   touch-action:none y capturando el puntero, el gesto es enteramente nuestro. */
+onda.style.touchAction = 'none';
 let arrastrando = false, movio = false;
+const punterosOnda = new Map();
+let distPrevOnda = null;
+
+function segEnClienteX(clientX) {
+  const r = onda.getBoundingClientRect();
+  const px = clamp((clientX - r.left) / r.width, 0, 1);
+  const { ini, ancho } = ventanaOnda();
+  return ini + px * ancho;
+}
+
 onda.addEventListener('pointerdown', e => {
   if (!muestra.buffer) return;
-  onda.setPointerCapture(e.pointerId);
+  e.preventDefault();
+  try { onda.setPointerCapture(e.pointerId); } catch (err) {}
+  punterosOnda.set(e.pointerId, e);
+  if (punterosOnda.size >= 2) {
+    arrastrando = false;
+    const [a, b] = [...punterosOnda.values()];
+    distPrevOnda = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+    return;
+  }
   arrastrando = true; movio = false;
-  const r = onda.getBoundingClientRect();
-  const seg = (e.clientX - r.left) / r.width * muestra.buffer.duration;
-  muestra.inicio = Math.max(0, Math.min(seg, muestra.buffer.duration - largoRegion()));
+  muestra.inicio = clamp(segEnClienteX(e.clientX), 0, Math.max(0, muestra.buffer.duration - largoRegion()));
   recalcularCortes();
 });
 onda.addEventListener('pointermove', e => {
+  if (!punterosOnda.has(e.pointerId)) return;
+  punterosOnda.set(e.pointerId, e);
+  const pts = [...punterosOnda.values()];
+  if (pts.length >= 2) {
+    const [a, b] = pts;
+    const dist = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+    const midX = (a.clientX + b.clientX) / 2;
+    if (distPrevOnda) aplicarZoomOnda(dist / distPrevOnda, segEnClienteX(midX));
+    distPrevOnda = dist;
+    return;
+  }
   if (!arrastrando || !muestra.buffer) return;
   movio = true;
-  const r = onda.getBoundingClientRect();
-  const seg = (e.clientX - r.left) / r.width * muestra.buffer.duration;
-  muestra.inicio = Math.max(0, Math.min(seg, muestra.buffer.duration - largoRegion()));
+  muestra.inicio = clamp(segEnClienteX(e.clientX), 0, Math.max(0, muestra.buffer.duration - largoRegion()));
   recalcularCortes();
 });
-onda.addEventListener('pointerup', e => {
+const soltarOnda = e => {
+  punterosOnda.delete(e.pointerId);
+  if (punterosOnda.size < 2) distPrevOnda = null;
+  if (punterosOnda.size > 0) return;
+  const fueArrastre = arrastrando;
   arrastrando = false;
-  if (movio || !muestra.buffer) return;
-  const r = onda.getBoundingClientRect();
-  const seg = (e.clientX - r.left) / r.width * muestra.buffer.duration;
+  if (movio || !fueArrastre || !muestra.buffer) return;
+  const seg = segEnClienteX(e.clientX);
   const i = muestra.cortes.findIndex(c => seg >= c.offset && seg < c.offset + c.dur);
   if (i >= 0) asignarCorteAlPad(i);
-});
+};
+onda.addEventListener('pointerup', soltarOnda);
+onda.addEventListener('pointercancel', soltarOnda);
+onda.addEventListener('wheel', e => {
+  if (!muestra.buffer) return;
+  e.preventDefault();
+  aplicarZoomOnda(Math.exp(-e.deltaY * 0.0015), segEnClienteX(e.clientX));
+}, { passive: false });
 
 window.addEventListener('resize', () => { picos = null; pintarOnda(); });
 

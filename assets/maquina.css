@@ -147,7 +147,7 @@
 .pad {
   position: relative; aspect-ratio: 1; border: 0; padding: 0;
   background: url("img/pad.png") no-repeat center / 100% 100%;
-  border-radius: 9px; cursor: pointer;
+  border-radius: 9px; cursor: pointer; overflow: hidden;
   display: flex; flex-direction: column; justify-content: flex-end;
   align-items: flex-start; gap: 2px; padding: 7px;
   color: var(--m-suave); text-align: left;
@@ -164,11 +164,14 @@
   position: absolute; top: 6px; right: 8px;
   font: 600 9px/1 var(--mono); opacity: .55;
 }
+/* Nombre y fuente truncan en una sola línea: cargar un sample con un nombre
+   largo no debe estirar el pad (rompía la cuadrícula de los 16). */
 .pad-nombre {
   font: 600 9.5px/1.15 var(--mono); letter-spacing: .04em;
-  text-transform: uppercase; word-break: break-word; max-width: 100%;
+  text-transform: uppercase; max-width: 100%;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.pad-fuente { font: 500 8px/1 var(--mono); opacity: .6; }
+.pad-fuente { font: 500 8px/1 var(--mono); opacity: .6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 
 /* ---- botones de panel ---- */
 .btn-maquina {
