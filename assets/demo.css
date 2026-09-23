@@ -227,10 +227,40 @@ tbody tr:hover td { background: var(--surface-2); }
 
 /* ---- lienzos / gráficos ---- */
 canvas { display: block; width: 100%; max-width: 100%; border-radius: var(--r); background: var(--surface-2); }
-svg.chart { display: block; width: 100%; height: auto; max-width: 100%; }
+svg.chart { display: block; width: 100%; height: auto; max-width: 100%; cursor: zoom-in; }
+svg.chart:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: var(--r); }
 svg.chart text { font: 500 10px var(--mono); fill: var(--muted); }
 svg.chart .axis { stroke: var(--line); stroke-width: 1; }
 svg.chart .gridline { stroke: var(--line-soft); stroke-width: 1; }
+
+/* ---- lightbox de gráficos: cualquier svg.chart se puede ampliar con zoom ---- */
+.chart-lightbox {
+  position: fixed; inset: 0; z-index: 200;
+  background: color-mix(in srgb, var(--surface) 90%, transparent);
+  backdrop-filter: blur(6px);
+  display: flex; align-items: center; justify-content: center;
+  cursor: grab; touch-action: none;
+}
+.chart-lightbox.is-panning { cursor: grabbing; }
+.chart-lightbox .cl-stage { width: min(94vw, 1100px); height: min(86vh, 760px); overflow: hidden; position: relative; }
+.chart-lightbox .cl-stage svg.chart {
+  position: absolute; left: 50%; top: 50%; cursor: inherit;
+  width: auto; max-width: none; will-change: transform;
+}
+.chart-lightbox .cl-close {
+  position: absolute; top: 16px; right: 16px; z-index: 1;
+  width: 38px; height: 38px; border-radius: var(--r); border: 1px solid var(--line);
+  background: var(--surface-2); color: var(--ink); cursor: pointer; font-size: 17px; line-height: 1;
+  display: flex; align-items: center; justify-content: center;
+}
+.chart-lightbox .cl-close:hover { border-color: var(--accent); color: var(--accent); }
+.chart-lightbox .cl-hint {
+  position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); text-align: center;
+  font: 500 11px/1.4 var(--mono); color: var(--muted); letter-spacing: .03em;
+  background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r);
+  padding: 7px 12px; pointer-events: none; max-width: 90vw;
+}
+@media (max-width: 640px) { .chart-lightbox .cl-hint { font-size: 10px; } }
 
 /* ---- consola ---- */
 .console {

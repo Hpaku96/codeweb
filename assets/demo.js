@@ -92,7 +92,7 @@
     const X = v => o.pad.l + (lx(v) - lx(xMin)) / (lx(xMax) - lx(xMin) || 1) * iw;
     const Y = v => o.pad.t + ih - (v - yMin) / (yMax - yMin || 1) * ih;
 
-    const svg = svgEl('svg', { class: 'chart', viewBox: `0 0 ${o.w} ${o.h}`, preserveAspectRatio: 'xMidYMid meet', role: 'img' });
+    const svg = svgEl('svg', { class: 'chart', viewBox: `0 0 ${o.w} ${o.h}`, preserveAspectRatio: 'xMidYMid meet', role: 'img', tabindex: '0', 'aria-label': 'Gráfico — clic o Enter para ampliar' });
 
     const yTickVals = o.yTickVals || Array.from({ length: o.yTicks + 1 }, (_, i) => yMin + (yMax - yMin) * i / o.yTicks);
     yTickVals.forEach(v => {
@@ -136,7 +136,7 @@
     const max = o.max !== undefined ? o.max : Math.max(...o.data.map(d => d.value), 1);
     const iw = o.w - o.pad.l - o.pad.r, ih = o.h - o.pad.t - o.pad.b;
     const bw = iw / o.data.length;
-    const svg = svgEl('svg', { class: 'chart', viewBox: `0 0 ${o.w} ${o.h}`, preserveAspectRatio: 'xMidYMid meet', role: 'img' });
+    const svg = svgEl('svg', { class: 'chart', viewBox: `0 0 ${o.w} ${o.h}`, preserveAspectRatio: 'xMidYMid meet', role: 'img', tabindex: '0', 'aria-label': 'Gráfico — clic o Enter para ampliar' });
     for (let i = 0; i <= o.yTicks; i++) {
       const v = max * i / o.yTicks, y = o.pad.t + ih - ih * i / o.yTicks;
       svg.appendChild(svgEl('line', { class: 'gridline', x1: o.pad.l, x2: o.w - o.pad.r, y1: y, y2: y }));
@@ -222,10 +222,133 @@
     });
   }
 
+  /* ---------- lightbox de gráficos ----------
+     Cualquier <svg class="chart"> que salga de lineChart o barChart se puede
+     ampliar con clic (o Enter/espacio con teclado): rueda o pellizco para zoom,
+     arrastrar para mover, doble clic para volver al tamaño original, Esc para
+     cerrar. Un solo listener delegado cubre las 30 demos sin tocar cada una. */
+  let lbActual = null;
+
+  function cerrarLightbox() {
+    if (!lbActual) return;
+    const { host, onKey, disparador } = lbActual;
+    host.remove();
+    document.removeEventListener('keydown', onKey);
+    lbActual = null;
+    if (disparador && disparador.isConnected) disparador.focus();
+  }
+
+  function abrirLightbox(svgOriginal) {
+    if (lbActual) cerrarLightbox();
+    const disparador = svgOriginal;
+    const clone = svgOriginal.cloneNode(true);
+    clone.removeAttribute('tabindex');
+    const vb = svgOriginal.viewBox.baseVal;
+    if (vb && vb.width) clone.style.width = Math.round(Math.min(960, vb.width * 1.4)) + 'px';
+
+    const closeBtn = el('button.cl-close', { type: 'button', 'aria-label': 'Cerrar gráfico ampliado', text: '✕' });
+    const hint = el('div.cl-hint', { text: 'Rueda o pellizca para zoom · arrastra para mover · doble clic para restaurar · Esc para cerrar' });
+    const stage = el('div.cl-stage', null, clone);
+    const host = el('div.chart-lightbox', { role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Gráfico ampliado' }, [stage, closeBtn, hint]);
+    document.body.appendChild(host);
+
+    let scale = 1, tx = 0, ty = 0;
+    const aplicar = () => { clone.style.transform = `translate(-50%,-50%) translate(${tx}px,${ty}px) scale(${scale})`; };
+    aplicar();
+
+    const centro = pts => ({
+      x: pts.reduce((s, p) => s + p.clientX, 0) / pts.length,
+      y: pts.reduce((s, p) => s + p.clientY, 0) / pts.length
+    });
+    const activos = new Map();
+    let distPrev = null, midPrev = null;
+    // setPointerCapture hace que el click sintético que sigue al pointerup caiga
+    // sobre "host" sin importar qué había debajo del cursor: no sirve para saber
+    // si se hizo clic en el fondo. Se rastrea a mano el objetivo del pointerdown
+    // y cuánto se movió, y solo se cierra si fue un clic quieto sobre el fondo.
+    let downTarget = null, downX = 0, downY = 0, arrastrado = false;
+
+    host.addEventListener('pointerdown', e => {
+      if (e.target === closeBtn) return;
+      downTarget = e.target; downX = e.clientX; downY = e.clientY; arrastrado = false;
+      host.setPointerCapture(e.pointerId);
+      activos.set(e.pointerId, e);
+      host.classList.add('is-panning');
+      midPrev = centro([...activos.values()]);
+      distPrev = null;
+    });
+    host.addEventListener('pointermove', e => {
+      if (!activos.has(e.pointerId)) return;
+      activos.set(e.pointerId, e);
+      if (Math.abs(e.clientX - downX) > 4 || Math.abs(e.clientY - downY) > 4) arrastrado = true;
+      const pts = [...activos.values()];
+      const mid = centro(pts);
+      if (pts.length >= 2) {
+        const [a, b] = pts;
+        const dist = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+        if (distPrev) scale = clamp(scale * (dist / distPrev), 0.4, 8);
+        distPrev = dist;
+      }
+      if (midPrev) { tx += mid.x - midPrev.x; ty += mid.y - midPrev.y; }
+      midPrev = mid;
+      aplicar();
+    });
+    // Mismo problema que arriba: con pointer capture activo, el 'dblclick' nativo
+    // también termina apuntando a "host". Se detecta el doble clic a mano,
+    // comparando dos soltadas quietas seguidas sobre el mismo objetivo.
+    let sueltaPrevia = 0, objetivoPrevio = null;
+    const soltar = e => {
+      activos.delete(e.pointerId);
+      const pts = [...activos.values()];
+      host.classList.toggle('is-panning', pts.length > 0);
+      midPrev = pts.length ? centro(pts) : null;
+      distPrev = null;
+      if (pts.length > 0) return;
+      if (downTarget === host && !arrastrado) { cerrarLightbox(); return; }
+      if (!arrastrado) {
+        const ahora = Date.now();
+        if (downTarget === objetivoPrevio && ahora - sueltaPrevia < 350) {
+          scale = 1; tx = 0; ty = 0; aplicar(); sueltaPrevia = 0; objetivoPrevio = null;
+        } else { sueltaPrevia = ahora; objetivoPrevio = downTarget; }
+      }
+    };
+    host.addEventListener('pointerup', soltar);
+    host.addEventListener('pointercancel', soltar);
+    host.addEventListener('lostpointercapture', soltar);
+
+    host.addEventListener('wheel', e => {
+      e.preventDefault();
+      scale = clamp(scale * Math.exp(-e.deltaY * 0.0015), 0.4, 8);
+      aplicar();
+    }, { passive: false });
+
+    closeBtn.addEventListener('click', cerrarLightbox);
+
+    const onKey = e => { if (e.key === 'Escape') cerrarLightbox(); };
+    document.addEventListener('keydown', onKey);
+    lbActual = { host, onKey, disparador };
+    closeBtn.focus();
+  }
+
+  function initChartLightbox() {
+    document.addEventListener('click', e => {
+      if (e.target.closest('.chart-lightbox')) return;
+      const svg = e.target.closest('svg.chart');
+      if (svg) abrirLightbox(svg);
+    });
+    document.addEventListener('keydown', e => {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      if (document.activeElement && document.activeElement.matches('svg.chart')) {
+        e.preventDefault();
+        abrirLightbox(document.activeElement);
+      }
+    });
+  }
+
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => { initThemeToggle(); announceReadouts(); });
+    document.addEventListener('DOMContentLoaded', () => { initThemeToggle(); announceReadouts(); initChartLightbox(); });
   } else {
-    initThemeToggle(); announceReadouts();
+    initThemeToggle(); announceReadouts(); initChartLightbox();
   }
 
   global.CODE = { $, $$, el, clamp, num, completos, fmt, soles, pct, token, bindRange, lineChart, barChart, draw, logger, onThemeChange, svgEl };
