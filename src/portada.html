@@ -511,6 +511,7 @@ h1,h2,h3{font-family:var(--display);margin:0;letter-spacing:-.01em}
       <li><a href="#contacto">Contacto</a></li>
       <li class="nav-drawer-cta"><a href="#contacto">Iniciar un proyecto →</a></li>
     </ul>
+    <button type="button" class="theme-toggle" id="installApp" title="Instalar app" aria-label="Instalar app" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13m0 0-4.5-4.5M12 16l4.5-4.5"/><path d="M4 18v2a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-2"/></svg></button>
     <button type="button" class="theme-toggle" id="themeToggle" aria-pressed="false"></button>
     <a class="nav-cta" href="#contacto">Iniciar un proyecto</a>
     <button class="nav-toggle" id="navToggle" aria-label="Abrir menú" aria-expanded="false" aria-controls="navLinks">
@@ -850,6 +851,35 @@ function initReveal(){
     paint();
   });
   paint();
+})();
+(function initInstalarApp(){
+  // El manifest solo existe en el documento completo (index.html/dist), no en el
+  // fragmento de artifact/index.html: si no está, no hay nada que instalar ni que
+  // registrar como service worker.
+  if (!document.querySelector('link[rel="manifest"]')) return;
+
+  if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js').catch(() => {});
+    });
+  }
+
+  const btn = $('#installApp');
+  if (!btn) return;
+  let prompt = null;
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    prompt = e;
+    btn.hidden = false;
+  });
+  btn.addEventListener('click', async () => {
+    if (!prompt) return;
+    btn.hidden = true;
+    prompt.prompt();
+    await prompt.userChoice;
+    prompt = null;
+  });
+  window.addEventListener('appinstalled', () => { btn.hidden = true; prompt = null; });
 })();
 function initHero3D(){
   const host = $('#heroStage');

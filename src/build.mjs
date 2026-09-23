@@ -6,6 +6,8 @@
  *   demos/<id>-<slug>.html   una demo autocontenida por proyecto
  *   index.html               la portada, servible desde la raíz del repo
  *   projects.json            el índice que consume la portada
+ *   manifest.json            metadatos de instalación de la PWA
+ *   sw.js                    service worker: cachea el sitio para uso sin conexión
  *   dist/                    copia del sitio lista para desplegar
  *   artifact/index.html      la portada sin esqueleto, para publicarla alojada
  *
@@ -22,12 +24,16 @@ const OUT = join(ROOT, 'demos');
 const FONTS = 'https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap';
 
 // Isotipo de marca como favicon vectorial: mismo trazo que el logo del header, cero peticiones extra.
+// El color va como "#E7B93D" (sin preescapar): encodeURIComponent ya se encarga de convertir el "#" a
+// "%23" una sola vez. Escribirlo como "%23E7B93D" aquí lo codifica dos veces y el navegador termina
+// recibiendo el color literal "%23E7B93D" como valor de stroke/fill, que no es un color válido: el
+// ícono se renderiza invisible.
 const FAVICON = 'data:image/svg+xml,' + encodeURIComponent(
   '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">' +
-  '<circle cx="50" cy="50" r="41" fill="none" stroke="%23E7B93D" stroke-width="8"/>' +
-  '<g fill="none" stroke="%23E7B93D" stroke-width="5" stroke-linecap="round">' +
+  '<circle cx="50" cy="50" r="41" fill="none" stroke="#E7B93D" stroke-width="8"/>' +
+  '<g fill="none" stroke="#E7B93D" stroke-width="5" stroke-linecap="round">' +
   '<path d="M30 26 L52 48"/><path d="M24 34 L40 50 L40 58"/><path d="M20 44 L30 54 L30 64"/>' +
-  '</g><g fill="%23E7B93D"><circle cx="52" cy="48" r="5.5"/><circle cx="40" cy="58" r="5.5"/><circle cx="30" cy="64" r="5.5"/></g>' +
+  '</g><g fill="#E7B93D"><circle cx="52" cy="48" r="5.5"/><circle cx="40" cy="58" r="5.5"/><circle cx="30" cy="64" r="5.5"/></g>' +
   '</svg>'
 );
 
@@ -142,11 +148,11 @@ const portada = (await readFile(join(ROOT, 'src', 'portada.html'), 'utf8'))
 await mkdir(join(ROOT, 'artifact'), { recursive: true });
 await writeFile(join(ROOT, 'artifact', 'index.html'), portada, 'utf8');
 
-// Para el documento completo, el <title> y la <meta description> de la portada se
-// extraen al <head> real en vez de dejarlos flotando dentro de <body> (HTML inválido
-// y, aquí, además duplicados con los del wrapper). Sus fuentes ya llegan por el
-// @import interno de la portada, así que el <link> de FONTS no se repite.
-const cabecera = portada.match(/^<title>([\s\S]*?)<\/title>\s*<meta name="description" content="([\s\S]*?)">\s*/);
+// Para el documento completo, el <title>, la <meta description>, el favicon y el script
+// que fija el tema se extraen al <head> real en vez de dejarlos flotando dentro de <body>
+// (HTML inválido y, aquí, además duplicados con los del wrapper). Sus fuentes ya llegan por
+// el @import interno de la portada, así que el <link> de FONTS no se repite.
+const cabecera = portada.match(/^<title>([\s\S]*?)<\/title>\s*<meta name="description" content="([\s\S]*?)">\s*<link rel="icon"[^>]*>\s*<script>[\s\S]*?<\/script>\s*/);
 const tituloPortada = cabecera ? cabecera[1] : 'CODE — Ingeniería de software a medida';
 const descPortada = cabecera ? cabecera[2] : 'CODE diseña y construye software a medida: desarrollo web, aplicaciones y herramientas a medida, backend e integraciones. Cobertura mundial, cotización a medida.';
 const portadaSinCabecera = cabecera ? portada.slice(cabecera[0].length) : portada;
@@ -161,7 +167,10 @@ const completo = `<!doctype html>
 <meta property="og:type" content="website">
 <meta property="og:title" content="${tituloPortada}">
 <meta property="og:description" content="${descPortada}">
+<meta name="theme-color" content="#08090b">
 <link rel="icon" href="${FAVICON}">
+<link rel="apple-touch-icon" href="assets/img/apple-touch-icon.png">
+<link rel="manifest" href="manifest.json">
 ${THEME_INIT}
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -172,6 +181,69 @@ ${portadaSinCabecera}
 </html>
 `;
 await writeFile(join(ROOT, 'index.html'), completo, 'utf8');
+
+/* ---- PWA: manifest + service worker ----
+   Los íconos los genera aparte `npm run icons` (como sprites.mjs, no corre en cada
+   build) y quedan commiteados en assets/img/. Acá solo se arma el manifest y la
+   lista de precache del service worker, siempre a partir de los archivos reales del
+   build — así nunca queda una demo vieja cacheada ni una nueva sin cachear. */
+const manifest = {
+  name: tituloPortada,
+  short_name: 'CODE',
+  description: descPortada,
+  start_url: 'index.html',
+  scope: '.',
+  display: 'standalone',
+  background_color: '#08090b',
+  theme_color: '#08090b',
+  icons: [
+    { src: 'assets/img/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+    { src: 'assets/img/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+    { src: 'assets/img/icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' }
+  ]
+};
+await writeFile(join(ROOT, 'manifest.json'), JSON.stringify(manifest, null, 2), 'utf8');
+
+const assetFiles = (await readdir(join(ROOT, 'assets'), { withFileTypes: true }))
+  .filter(f => f.isFile()).map(f => 'assets/' + f.name);
+const imgFiles = (await readdir(join(ROOT, 'assets', 'img'), { withFileTypes: true }))
+  .filter(f => f.isFile()).map(f => 'assets/img/' + f.name);
+const PRECACHE = [
+  '.', 'index.html', 'manifest.json', 'projects.json',
+  ...files.map(f => 'demos/' + f),
+  ...assetFiles, ...imgFiles
+];
+// Versión = huella del propio precache, no un timestamp: solo cambia (y solo entonces
+// invalida la caché de los visitantes) cuando el contenido publicado realmente cambió.
+const swVersion = PRECACHE.length + ':' + PRECACHE.join(',').length;
+const sw = `// Generado por src/build.mjs — no editar a mano.
+const CACHE = 'code-${swVersion}';
+const PRECACHE = ${JSON.stringify(PRECACHE)};
+
+self.addEventListener('install', (e) => {
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(PRECACHE)).then(() => self.skipWaiting()));
+});
+
+self.addEventListener('activate', (e) => {
+  e.waitUntil(
+    caches.keys()
+      .then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
+      .then(() => self.clients.claim())
+  );
+});
+
+self.addEventListener('fetch', (e) => {
+  if (e.request.method !== 'GET' || new URL(e.request.url).origin !== location.origin) return;
+  e.respondWith(
+    caches.match(e.request).then(hit => hit || fetch(e.request).then(res => {
+      const copy = res.clone();
+      caches.open(CACHE).then(c => c.put(e.request, copy));
+      return res;
+    }).catch(() => caches.match('index.html')))
+  );
+});
+`;
+await writeFile(join(ROOT, 'sw.js'), sw, 'utf8');
 
 /* ---- dist ----
    El sitio desplegable, sin el código fuente ni las dependencias: es lo que
@@ -184,6 +256,8 @@ await cp(join(ROOT, 'demos'), join(DIST, 'demos'), { recursive: true });
 await cp(join(ROOT, 'assets'), join(DIST, 'assets'), { recursive: true });
 await writeFile(join(DIST, 'index.html'), completo, 'utf8');
 await writeFile(join(DIST, 'projects.json'), JSON.stringify(index, null, 2), 'utf8');
+await writeFile(join(DIST, 'manifest.json'), JSON.stringify(manifest, null, 2), 'utf8');
+await writeFile(join(DIST, 'sw.js'), sw, 'utf8');
 
 console.log(`\n${index.length} demos en demos/ · índice en projects.json`);
 console.log('portada en index.html · sitio desplegable en dist/ · versión alojada en artifact/index.html');

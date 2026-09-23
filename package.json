@@ -7,6 +7,7 @@
   "scripts": {
     "build": "node src/build.mjs",
     "sprites": "node src/sprites.mjs",
+    "icons": "node src/generar-iconos.mjs",
     "test": "node src/build.mjs && node src/smoke.mjs",
     "test:export": "node src/probar-exportacion.mjs",
     "test:audio": "node src/probar-audio.mjs",
